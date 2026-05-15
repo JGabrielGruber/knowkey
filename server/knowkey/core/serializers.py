@@ -113,6 +113,29 @@ class NodeSerializer(serializers.ModelSerializer):
         return instance
 
 
+class NodeListSerializer(serializers.ModelSerializer):
+    """Layer 0/1 — super fast & light for listing"""
+
+    node_type = NodeTypeSerializer(read_only=True)
+    author = AuthorSerializer(read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Node
+        fields = [
+            "id",
+            "title",
+            "summary",
+            "node_type",
+            "author",
+            "tags",
+            "version_number",
+            "is_archived",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class NodeRelationshipSerializer(serializers.ModelSerializer):
     source = serializers.UUIDField(source="source_id", write_only=True)
     target = serializers.UUIDField(source="target_id", write_only=True)

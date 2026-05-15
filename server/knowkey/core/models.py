@@ -25,6 +25,23 @@ class RelationshipType(models.TextChoices):
     VERSION_OF = "version_of", "Is version of"  # for 🍄‍🟫
 
 
+# ==================== MANAGERS =======================
+class NodeManager(models.Manager):
+    """All smart queries for 🍄 live here — reusable by API and MCP"""
+
+    def latest_versions(self):
+        """Return only the current (latest) version of each node"""
+        return self.filter(version_of__isnull=True)  # latest versions have no parent
+
+    def all_versions(self):
+        """For history view"""
+        return self.all()
+
+    def with_related(self):
+        """Optimized for list views"""
+        return self.select_related("node_type", "author").prefetch_related("tags")
+
+
 # ====================== MODELS ======================
 class Author(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -109,6 +126,8 @@ class Node(models.Model):
 
     # Relationships
     tags = models.ManyToManyField(Tag, blank=True, related_name="nodes")
+
+    objects = NodeManager()
 
     class Meta:
         ordering = ["-created_at"]
