@@ -1,16 +1,19 @@
-import uuid
-
-from django.db.models.signals import post_save, pre_delete, pre_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from .models import Node, NodeRelationship
 
 
-# ====================== VERSIONING ======================
+# ====================== VERSIONING + RELATIONSHIP SNAPSHOTS ======================
 @receiver(pre_save, sender=Node)
 def handle_node_versioning(sender, instance, **kwargs):
     """Keep the original Node ID as the stable 'head' (latest version).
-    Every meaningful change creates an immutable history 🍄‍🟫."""
+    Every meaningful content change creates an immutable history row
+    AND freezes the current outgoing relationships."""
+
+    # NEW: Allow revert_to() to restore without creating duplicate history
+    if getattr(instance, "_bypass_versioning", False):
+        return
 
     if not instance.pk:
         # Brand new node → this becomes the head
@@ -24,7 +27,7 @@ def handle_node_versioning(sender, instance, **kwargs):
     except Node.DoesNotExist:
         return
 
-    # If nothing important changed → just let normal update happen (e.g. metadata only)
+    # If nothing important changed → skip history (e.g. metadata, tags only)
     if (
         old.content == instance.content
         and old.summary == instance.summary
@@ -32,8 +35,7 @@ def handle_node_versioning(sender, instance, **kwargs):
     ):
         return
 
-    # === CREATE IMMUTABLE HISTORY ROW (🍄‍🟫) ===
-    # We copy the OLD state into a new row
+    # === 1. CREATE IMMUTABLE HISTORY ROW ===
     history = Node.objects.create(
         title=old.title,
         summary=old.summary,
@@ -41,24 +43,33 @@ def handle_node_versioning(sender, instance, **kwargs):
         embedding=old.embedding,
         node_type=old.node_type,
         author=old.author,
-        version_of=old,  # points to the stable head
-        version_number=old.version_number,  # keep old number for this history entry
+        version_of=old,  # points to stable head
+        version_number=old.version_number,  # history keeps the version it represents
         metadata=old.metadata.copy() if old.metadata else {},
         is_archived=old.is_archived,
-        # tags are copied via M2M in post_save (see below)
     )
 
-    # Copy tags to history node
+    # Copy tags
     history.tags.set(old.tags.all())
 
-    # === UPDATE THE HEAD NODE (same ID, now becomes newest) ===
+    # === 2. FREEZE OUTGOING RELATIONSHIPS (new!) ===
+    for rel in old.outgoing_relationships.all():
+        NodeRelationship.objects.create(
+            source=history,  # relationship belongs to this historical snapshot
+            target=rel.target,  # still points to live target
+            relationship_type=rel.relationship_type,
+            weight=rel.weight,
+            created_by=rel.created_by,
+        )
+
+    # === 3. UPDATE THE HEAD NODE (same ID, becomes newest) ===
     instance.version_number = old.version_number + 1
-    instance.version_of = None  # this node remains the head
+    instance.version_of = None  # remains the head
 
-    # Note: tags and relationships stay on the head (they belong to the concept)
+    # Note: tags + relationships stay on the head (current state)
 
 
-# ====================== EMBEDDING QUEUE (future-proof) ======================
+# ====================== EMBEDDING QUEUE ======================
 @receiver(post_save, sender=Node)
 def queue_embedding(sender, instance, created, **kwargs):
     """After any save, push to Redis stream so the agent can generate embedding"""
@@ -80,26 +91,15 @@ def queue_embedding(sender, instance, created, **kwargs):
     }
 
     r.xadd("knowkey:embedding_jobs", payload, maxlen=10000)
-    # This is fire-and-forget — super safe
 
 
 # ====================== RELATIONSHIP STATS ======================
 @receiver(post_save, sender=NodeRelationship)
 def update_relationship_stats(sender, instance, **kwargs):
     """Keep metadata stats fresh"""
-    # Example: increment discussion_count on target
     if instance.relationship_type == "discusses":
         target = instance.target
         meta = target.metadata or {}
         meta["discussion_count"] = meta.get("discussion_count", 0) + 1
         target.metadata = meta
         target.save(update_fields=["metadata"])
-
-
-# ====================== SOFT DELETE PROTECTION ======================
-@receiver(pre_delete, sender=Node)
-def prevent_hard_delete(sender, instance, **kwargs):
-    """Never really delete — just archive"""
-    instance.is_archived = True
-    instance.save()
-    raise Exception("Hard delete blocked — node was archived instead")
