@@ -67,15 +67,3 @@ def handle_node_versioning(sender, instance, **kwargs):
     instance.version_of = None  # remains the head
 
     # Note: tags + relationships stay on the head (current state)
-
-
-# ====================== RELATIONSHIP STATS ======================
-@receiver(post_save, sender=NodeRelationship)
-def update_relationship_stats(sender, instance, **kwargs):
-    """Keep metadata stats fresh"""
-    if instance.relationship_type == "discusses":
-        target = instance.target
-        meta = target.metadata or {}
-        meta["discussion_count"] = meta.get("discussion_count", 0) + 1
-        target.metadata = meta
-        target.save(update_fields=["metadata"])

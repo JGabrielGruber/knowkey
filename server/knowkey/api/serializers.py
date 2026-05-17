@@ -158,3 +158,16 @@ class NodeRelationshipSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+    def validate(self, data):
+        """Enforce the model's rule: relationships only between live nodes."""
+        # Build a temporary instance so we can run model validation
+        instance = NodeRelationship(
+            source=data.get("source"),
+            target=data.get("target"),
+            relationship_type=data.get("relationship_type"),
+            weight=data.get("weight", 1.0),
+            created_by=data.get("created_by"),
+        )
+        instance.full_clean()  # This calls NodeRelationship.clean()
+        return data
