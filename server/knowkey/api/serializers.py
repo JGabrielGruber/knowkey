@@ -1,14 +1,12 @@
-from rest_framework import serializers
-
-from .models import (
+from knowkey.core.models import (
     Author,
-    AuthorType,
     Node,
     NodeRelationship,
     NodeType,
     RelationshipType,
     Tag,
 )
+from rest_framework import serializers
 
 
 class AuthorSerializer(serializers.ModelSerializer):
@@ -34,6 +32,8 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class NodeSerializer(serializers.ModelSerializer):
+    """Full serializer used for detail, create, update, and revert responses"""
+
     node_type = NodeTypeSerializer(read_only=True)
     node_type_id = serializers.UUIDField(write_only=True, required=True)
 
@@ -45,7 +45,7 @@ class NodeSerializer(serializers.ModelSerializer):
         child=serializers.UUIDField(), write_only=True, required=False
     )
 
-    # embedding will be filled automatically later
+    is_latest = serializers.BooleanField(read_only=True)
     embedding = serializers.ListField(read_only=True, child=serializers.FloatField())
 
     class Meta:
@@ -62,6 +62,7 @@ class NodeSerializer(serializers.ModelSerializer):
             "author_id",
             "version_of",
             "version_number",
+            "is_latest",
             "metadata",
             "is_archived",
             "created_at",
@@ -69,36 +70,38 @@ class NodeSerializer(serializers.ModelSerializer):
             "tags",
             "tags_ids",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "version_number"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "version_number",
+            "is_latest",
+        ]
 
     def create(self, validated_data):
-        # Extract our custom fields
         tags_ids = validated_data.pop("tags_ids", [])
         node_type_id = validated_data.pop("node_type_id")
         author_id = validated_data.pop("author_id")
 
-        # Create the node
         node = Node.objects.create(
-            node_type_id=node_type_id, author_id=author_id, **validated_data
+            node_type_id=node_type_id,
+            author_id=author_id,
+            **validated_data,
         )
 
-        # Add tags if any were sent
         if tags_ids:
             node.tags.set(tags_ids)
 
         return node
 
     def update(self, instance, validated_data):
-        # Same handling for updates
         tags_ids = validated_data.pop("tags_ids", None)
         node_type_id = validated_data.pop("node_type_id", None)
         author_id = validated_data.pop("author_id", None)
 
-        # Update simple fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Update ForeignKeys if sent
         if node_type_id is not None:
             instance.node_type_id = node_type_id
         if author_id is not None:
@@ -106,7 +109,6 @@ class NodeSerializer(serializers.ModelSerializer):
 
         instance.save()
 
-        # Update tags if sent
         if tags_ids is not None:
             instance.tags.set(tags_ids)
 
@@ -114,11 +116,12 @@ class NodeSerializer(serializers.ModelSerializer):
 
 
 class NodeListSerializer(serializers.ModelSerializer):
-    """Layer 0/1 — super fast & light for listing"""
+    """Lightweight serializer for list views (fast)"""
 
     node_type = NodeTypeSerializer(read_only=True)
     author = AuthorSerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
+    is_latest = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Node
@@ -130,6 +133,7 @@ class NodeListSerializer(serializers.ModelSerializer):
             "author",
             "tags",
             "version_number",
+            "is_latest",
             "is_archived",
             "created_at",
             "updated_at",
@@ -137,8 +141,6 @@ class NodeListSerializer(serializers.ModelSerializer):
 
 
 class NodeRelationshipSerializer(serializers.ModelSerializer):
-    source = serializers.UUIDField(source="source_id", write_only=True)
-    target = serializers.UUIDField(source="target_id", write_only=True)
     relationship_type_display = serializers.CharField(
         source="get_relationship_type_display", read_only=True
     )

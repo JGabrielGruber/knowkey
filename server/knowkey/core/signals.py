@@ -52,7 +52,7 @@ def handle_node_versioning(sender, instance, **kwargs):
     # Copy tags
     history.tags.set(old.tags.all())
 
-    # === 2. FREEZE OUTGOING RELATIONSHIPS (new!) ===
+    # === 2. FREEZE OUTGOING RELATIONSHIPS ===
     for rel in old.outgoing_relationships.all():
         NodeRelationship.objects.create(
             source=history,  # relationship belongs to this historical snapshot
@@ -67,30 +67,6 @@ def handle_node_versioning(sender, instance, **kwargs):
     instance.version_of = None  # remains the head
 
     # Note: tags + relationships stay on the head (current state)
-
-
-# ====================== EMBEDDING QUEUE ======================
-@receiver(post_save, sender=Node)
-def queue_embedding(sender, instance, created, **kwargs):
-    """After any save, push to Redis stream so the agent can generate embedding"""
-    import json
-    import os
-
-    from redis import Redis
-
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    r = Redis.from_url(redis_url, decode_responses=True)
-
-    payload = {
-        "node_id": str(instance.id),
-        "action": "generate_embedding",
-        "title": instance.title,
-        "summary": instance.summary or "",
-        "content": instance.content or "",
-        "timestamp": str(instance.updated_at),
-    }
-
-    r.xadd("knowkey:embedding_jobs", payload, maxlen=10000)
 
 
 # ====================== RELATIONSHIP STATS ======================

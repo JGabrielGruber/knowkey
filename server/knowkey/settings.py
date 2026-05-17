@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "knowkey.core",
+    "knowkey.worker",
+    "knowkey.api",
 ]
 
 MIDDLEWARE = [
