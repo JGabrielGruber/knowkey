@@ -58,19 +58,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Starting Knowkey MCP Server..."))
         self.stdout.write(f"Transport : {transport}")
 
-        # Configure host and port
-        mcp.settings.host = host
-        mcp.settings.port = port
-
         # Security: allowed_hosts is important for HTTP-based transports
         if transport in ["streamable-http", "sse"]:
-            if allowed_hosts:
-                mcp.settings.transport_security.allowed_hosts = allowed_hosts
-                self.stdout.write(f"Allowed hosts: {allowed_hosts}")
-
             self.stdout.write(f"Server listening on http://{host}:{port}")
+            mcp.run(transport=transport, host=host, port=port)
 
-        if transport == "stdio":
+        elif transport == "stdio":
             mcp.run()
-        else:
-            mcp.run(transport=transport)
