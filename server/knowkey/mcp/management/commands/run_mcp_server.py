@@ -67,17 +67,6 @@ class Command(BaseCommand):
             if allowed_hosts:
                 mcp.settings.transport_security.allowed_hosts = allowed_hosts
                 self.stdout.write(f"Allowed hosts: {allowed_hosts}")
-            else:
-                # Sensible default for local development
-                mcp.settings.transport_security.allowed_hosts = [
-                    "127.0.0.1",
-                    "localhost",
-                ]
-                self.stdout.write(
-                    self.style.WARNING(
-                        "No --allowed-hosts provided. Using default: ['127.0.0.1', 'localhost']"
-                    )
-                )
 
             self.stdout.write(f"Server listening on http://{host}:{port}")
 
