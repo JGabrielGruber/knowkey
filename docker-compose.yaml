@@ -70,3 +70,27 @@ services:
       - ./server/:/app
     ports:
       - "8000:8000"
+
+  knowkey-mcp:
+    build:
+      context: ./server/
+      dockerfile: Dockerfile
+    container_name: knowkey-mcp
+    command: python manage.py run_mcp_server --host 0.0.0.0 --port 8001
+    depends_on:
+      - postgres
+      - redis
+      - knowkey-migration
+    environment:
+      DJANGO_SETTINGS_MODULE: knowkey.settings
+      POSTGRES_DB: knowkey
+      POSTGRES_USER: knowkey
+      POSTGRES_PASSWORD: knowkey123
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "True"
+    volumes:
+      - ./server/:/app
+    ports:
+      - "8001:8001"
+

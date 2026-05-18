@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "knowkey.core",
     "knowkey.worker",
     "knowkey.api",
+    "knowkey.mcp",
 ]
 
 MIDDLEWARE = [
