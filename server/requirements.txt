@@ -10,4 +10,4 @@ sqlparse==0.5.5
 typing_extensions==4.15.0
 redis==7.4.0
 django-filter==25.2
-mcp[cli]==1.27.1
+fastmcp==3.3.1

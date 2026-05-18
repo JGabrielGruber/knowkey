@@ -21,7 +21,7 @@ from typing import Any, Optional
 
 import django
 from django.db import transaction
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 # =============================================================================
 # Django Setup (safe when imported from management command)
@@ -67,6 +67,7 @@ mcp = FastMCP(
     3. Use precise relationship types
     4. Include good summaries and provenance metadata
     """,
+    version="0.0.1",
 )
 
 
@@ -206,7 +207,7 @@ def read_node(node_id: str) -> str:
 # =============================================================================
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def search_nodes(
     query: str,
@@ -244,7 +245,7 @@ def search_nodes(
     return serialize_node_list(list(qs))
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def get_node(node_id: str) -> dict:
     """Retrieve full details of one node including its relationships."""
@@ -259,7 +260,7 @@ def get_node(node_id: str) -> dict:
         return {"error": f"Node {node_id} not found"}
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def create_node(
     title: str,
@@ -309,7 +310,7 @@ def create_node(
         return {"error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def create_relationship(
     source_node_id: str,
@@ -356,7 +357,7 @@ def create_relationship(
         return {"error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def create_node_type(
     name: str,
@@ -384,7 +385,7 @@ def create_node_type(
         return {"error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def create_relationship_type(
     value: str,  # e.g. "implements"
@@ -414,7 +415,7 @@ def create_relationship_type(
         return {"error": str(e)}
 
 
-@mcp.tool()
+@mcp.tool
 @sync_to_async()
 def create_tag(
     name: str,
@@ -439,7 +440,7 @@ def create_tag(
 # =============================================================================
 
 
-@mcp.prompt()
+@mcp.prompt
 @sync_to_async()
 def extract_and_persist_knowledge(
     conversation_transcript: str,
