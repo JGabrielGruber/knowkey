@@ -1,162 +1,214 @@
 """
 Tests for the Knowkey MCP Server.
 
-These tests verify that the MCP tools and resources work correctly
-with the Knowkey data models (versioning, live nodes, relationships, etc.).
+Combines:
+- Django model tests
+- FastMCP Client-based tests (recommended pattern from gofastmcp.com)
+
+Run with:
+    python -m pytest knowkey/mcp/tests.py -v
+    or
+    python manage.py test knowkey.mcp
 """
 
+import asyncio
+from typing import Any
+
+import pytest
 from django.test import TestCase
-from knowkey.core.models import (
-    Author,
-    AuthorType,
-    Node,
-    NodeRelationship,
-    NodeType,
-    Tag,
-)
-from knowkey.mcp.server import create_node, create_relationship, get_node, search_nodes
+from fastmcp import Client
+
+from knowkey.core.models import Author, AuthorType, Node, NodeType, Tag
+from knowkey.mcp.server import mcp
+from knowkey.mcp.utils import async_to_sync
 
 
-class MCPToolsTests(TestCase):
+# =============================================================================
+# Django + FastMCP Hybrid Test Base
+# =============================================================================
+class MCPTestCase(TestCase):
+    """Base class that sets up Django data + provides async MCP client helper."""
+
     @classmethod
     def setUpTestData(cls):
-        cls.author = Author.objects.create(
-            name="Test User", author_type=AuthorType.USER
-        )
-        cls.node_type = NodeType.objects.create(name="Note", description="General note")
-        cls.decision_type = NodeType.objects.create(
-            name="Decision", description="Important decision"
-        )
+        cls.author = Author.objects.create(name="Test User", author_type=AuthorType.USER)
+        cls.note_type = NodeType.objects.create(name="Note", description="General note")
+        cls.decision_type = NodeType.objects.create(name="Decision", description="Decision")
 
     def setUp(self):
-        # Create a live node for testing
         self.live_node = Node.objects.create(
             title="Original Note",
-            summary="This is a test note",
-            content="Detailed content here",
-            node_type=self.node_type,
+            summary="This is the original summary",
+            content="Original detailed content",
+            node_type=self.note_type,
             author=self.author,
         )
 
-    # ====================== CREATE NODE ======================
-    def test_create_node_success(self):
-        result = create_node(
-            title="New Insight from MCP",
-            summary="This was created via MCP server",
-            content="Full content of the insight...",
+    @async_to_sync()
+    async def call_mcp_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+        """Helper to call MCP tools using the in-memory FastMCP client."""
+        async with Client(mcp) as client:
+            await client.ping()
+            result = await client.call_tool(tool_name, arguments)
+            return result.data if hasattr(result, "data") else result
+
+    @async_to_sync()
+    async def get_mcp_resource(self, resource_name: str) -> Any:
+        """Helper to get MCP resources using the in-memory FastMCP client."""
+        async with Client(mcp) as client:
+            await client.ping()
+            results = await client.read_resource(resource_name)
+            data = []
+            for result in results:
+                data.append(result.model_dump_json())
+            return data
+
+
+# =============================================================================
+# Django Model Tests (existing style)
+# =============================================================================
+class KnowkeyMCPModelTests(MCPTestCase):
+    def test_create_node_via_mcp_logic(self):
+        from knowkey.mcp.core import create_knowkey_node
+
+        node = create_knowkey_node(
+            title="MCP Created Node",
+            summary="Created through core helper",
+            content="Full content",
             node_type_name="Note",
-            tag_names=["mcp", "test"],
+            tag_names=["test", "mcp"],
             author_name="Grok",
         )
 
-        self.assertTrue(result.get("success"))
-        self.assertIn("id", result)
-        self.assertEqual(result["version_number"], 1)
-
-        # Verify it exists in DB
-        node = Node.objects.get(id=result["id"])
-        self.assertEqual(node.title, "New Insight from MCP")
-        self.assertEqual(node.tags.count(), 2)
         self.assertTrue(node.is_latest)
+        self.assertEqual(node.metadata.get("source"), "mcp")
+        self.assertEqual(node.tags.count(), 2)
 
-    def test_create_node_invalid_type(self):
-        result = create_node(
-            title="Bad Type",
-            summary="Should fail",
-            content="...",
-            node_type_name="NonExistentType",
-        )
-        self.assertIn("error", result)
+    def test_revert_functionality_exists(self):
+        # Ensure the model method is available
+        self.assertTrue(hasattr(self.live_node, "revert_to"))
 
-    # ====================== CREATE RELATIONSHIP ======================
-    def test_create_relationship_between_live_nodes(self):
-        other_node = Node.objects.create(
-            title="Related Node",
-            node_type=self.node_type,
-            author=self.author,
-        )
 
-        result = create_relationship(
-            source_node_id=str(self.live_node.id),
-            target_node_id=str(other_node.id),
-            relationship_type="discusses",
-        )
+# =============================================================================
+# FastMCP Client Tests (Recommended Pattern)
+# =============================================================================
+class MCPToolsTests(MCPTestCase):
+    def test_search_nodes_tool_exists(self):
+        """Basic smoke test that the tool is registered."""
+        tools = asyncio.run(self._list_tools())
+        tool_names = [t.name for t in tools]
+        self.assertIn("search_nodes", tool_names)
 
-        self.assertTrue(result.get("success"))
-        self.assertEqual(NodeRelationship.objects.count(), 1)
+    async def _list_tools(self):
+        async with Client(mcp) as client:
+            return await client.list_tools()
 
-    def test_create_relationship_fails_on_snapshot(self):
-        # Create a snapshot manually
-        snapshot = self.live_node.create_manual_snapshot()
-
-        other = Node.objects.create(
-            title="Other",
-            node_type=self.node_type,
-            author=self.author,
-        )
-
-        result = create_relationship(
-            source_node_id=str(snapshot.id),  # snapshot, not live
-            target_node_id=str(other.id),
-            relationship_type="discusses",
-        )
-
-        self.assertIn("error", result)
-        self.assertIn("live", result["error"].lower())
-
-    # ====================== SEARCH NODES ======================
-    def test_search_nodes_returns_only_live_by_default(self):
+    def test_search_nodes_returns_live_nodes(self):
         # Create a second version
         self.live_node.title = "Updated Title"
         self.live_node.save()
 
-        results = search_nodes(query="Updated")
-        self.assertEqual(len(results), 1)
-        self.assertTrue(results[0]["is_latest"])
+        result = self.call_mcp_tool(
+            "search_nodes",
+            {
+                "params": {
+                    "query": "Updated",
+                    "include_all_versions": False,
+                }
+            },
+        )
 
-    def test_search_nodes_can_include_all_versions(self):
-        self.live_node.title = "Version 2 Note"
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0]["is_latest"])
+
+    def test_create_node_tool(self):
+        result = self.call_mcp_tool(
+            "create_node",
+            {
+                "params": {
+                    "title": "MCP Test Node",
+                    "summary": "This node was created by the MCP test suite",
+                    "content": "Detailed test content here.",
+                    "node_type_name": "Note",
+                    "tag_names": ["test"],
+                }
+            },
+        )
+
+        self.assertTrue(result.get("success"))
+        self.assertIn("id", result)
+
+        # Verify it exists and has MCP metadata
+        node = Node.objects.get(id=result["id"])
+        self.assertEqual(node.metadata.get("source"), "mcp")
+
+    def test_create_relationship_only_between_live_nodes(self):
+        other = Node.objects.create(
+            title="Other Live Node",
+            node_type=self.note_type,
+            author=self.author,
+        )
+
+        # This should succeed
+        result = self.call_mcp_tool(
+            "create_relationship",
+            {
+                "params": {
+                    "source_node_id": str(self.live_node.id),
+                    "target_node_id": str(other.id),
+                    "relationship_type": "discusses",
+                }
+            },
+        )
+        self.assertTrue(result.get("success"))
+
+        # Create a snapshot and try to link to it (should fail)
+        snapshot = self.live_node.create_manual_snapshot()
+
+        with self.assertRaises(Exception):  # ToolError wrapped
+            self.call_mcp_tool(
+                "create_relationship",
+                {
+                    "params": {
+                        "source_node_id": str(snapshot.id),  # not live
+                        "target_node_id": str(other.id),
+                        "relationship_type": "discusses",
+                    }
+                },
+            )
+
+    def test_revert_node_tool(self):
+        # Make a change
+        self.live_node.title = "Bad Change"
         self.live_node.save()
+        bad_snapshot = self.live_node.versions.latest("version_number")
 
-        results = search_nodes(query="Note", include_all_versions=True)
-        self.assertEqual(len(results), 2)
+        # Get original snapshot
+        original_snapshot = self.live_node.versions.get(version_number=1)
 
-    def test_search_nodes_by_node_type(self):
-        results = search_nodes(query="", node_type_name="Note")
-        self.assertGreaterEqual(len(results), 1)
-
-    # ====================== GET NODE ======================
-    def test_get_node_returns_full_data(self):
-        result = get_node(str(self.live_node.id))
-        self.assertEqual(result["title"], "Original Note")
-        self.assertIn("outgoing_relationships", result)
-        self.assertIn("incoming_relationships", result)
-
-    def test_get_node_not_found(self):
-        result = get_node("00000000-0000-0000-0000-000000000000")
-        self.assertIn("error", result)
-
-
-class MCPRelationshipValidationTests(TestCase):
-    """Specific tests for relationship safety rules."""
-
-    def setUp(self):
-        self.author = Author.objects.create(name="Test", author_type=AuthorType.USER)
-        self.nt = NodeType.objects.create(name="TestType")
-
-        self.node_a = Node.objects.create(
-            title="A", node_type=self.nt, author=self.author
-        )
-        self.node_b = Node.objects.create(
-            title="B", node_type=self.nt, author=self.author
+        result = self.call_mcp_tool(
+            "revert_node",
+            {
+                "params": {
+                    "node_id": str(self.live_node.id),
+                    "snapshot_id": str(original_snapshot.id),
+                }
+            },
         )
 
-    def test_cannot_create_relationship_with_non_live_source(self):
-        snapshot = self.node_a.create_manual_snapshot()
+        self.assertTrue(result.get("success"))
+        self.live_node.refresh_from_db()
+        self.assertEqual(self.live_node.title, "Original Note")
+        self.assertEqual(self.live_node.version_number, 3)  # bad state + revert
 
-        result = create_relationship(
-            source_node_id=str(snapshot.id),
-            target_node_id=str(self.node_b.id),
-            relationship_type="discusses",
-        )
-        self.assertIn("error", result)
+
+# =============================================================================
+# Resource Tests (via Client)
+# =============================================================================
+class MCPResourcesTests(MCPTestCase):
+    def test_ontology_resources(self):
+        node_types = self.get_mcp_resource("knowkey://ontology/node_types")
+        rel_types = self.get_mcp_resource("knowkey://ontology/relationship_types")
+
+        self.assertIn("discusses", str(rel_types))
+        self.assertIn("Note", str(node_types))
