@@ -220,7 +220,6 @@ def get_wizard_steps() -> list[dict]:
 
 
 @mcp.tool
-@sync_to_async()
 async def knowledge_wizard(
     goal: str = Field(
         ...,
