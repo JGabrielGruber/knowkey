@@ -7,11 +7,10 @@ Create typed connections between live nodes only.
 from asgiref.sync import async_to_sync
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
-from pydantic import Field
-
 from knowkey.core.models import Node, NodeRelationship, RelationshipType
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
+from pydantic import Field
 
 
 @mcp.tool
@@ -19,8 +18,12 @@ from knowkey.mcp.utils import sync_to_async
 def create_relationship(
     source_node_id: str = Field(..., description="UUID of source (live) node"),
     target_node_id: str = Field(..., description="UUID of target (live) node"),
-    relationship_type: str = Field(..., description="Valid type from knowkey://ontology/relationship_types"),
-    weight: float = Field(default=1.0, ge=0.0, le=10.0, description="Relationship strength"),
+    relationship_type: str = Field(
+        ..., description="Valid type from knowkey://ontology/relationship_types"
+    ),
+    weight: float = Field(
+        default=1.0, ge=0.0, le=10.0, description="Relationship strength"
+    ),
     ctx: Context | None = None,
 ) -> dict:
     """
@@ -51,7 +54,9 @@ def create_relationship(
     if relationship_type not in valid_types:
         raise ToolError(f"Invalid relationship_type. Valid: {valid_types}")
 
-    author = __import__("knowkey.mcp.core", fromlist=["get_or_create_author"]).get_or_create_author()
+    author = __import__(
+        "knowkey.mcp.core", fromlist=["get_or_create_author"]
+    ).get_or_create_author()
 
     rel = NodeRelationship.objects.create(
         source=source,

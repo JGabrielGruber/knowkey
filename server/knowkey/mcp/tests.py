@@ -10,7 +10,6 @@ from typing import Any
 import pytest
 from django.test import TestCase
 from fastmcp import Client
-
 from knowkey.core.models import Author, AuthorType, Node, NodeType, Tag
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import async_to_sync
@@ -27,9 +26,7 @@ class MCPTestCase(TestCase):
         cls.author = Author.objects.create(
             name="Test User", author_type=AuthorType.USER
         )
-        cls.note_type = NodeType.objects.create(
-            name="Note", description="General note"
-        )
+        cls.note_type = NodeType.objects.create(name="Note", description="General note")
         cls.decision_type = NodeType.objects.create(
             name="Decision", description="Decision record"
         )
@@ -225,6 +222,60 @@ class MCPResourcesTests(MCPTestCase):
         data = self.get_mcp_resource(f"knowkey://node/{self.live_node.id}")
         self.assertGreater(len(data), 0)
         self.assertIn("Original", str(data))
+
+
+# ====================== NODE TYPE TOOL TESTS ======================
+class MCPNodeTypeTests(MCPTestCase):
+
+    def test_create_node_type_tool(self):
+        result = self.call_mcp_tool(
+            "create_node_type",
+            {
+                "name": "Analysis",
+                "description": "A recorded analysis with context, alternatives, and outcome",
+                "icon": "⚖️",
+                "color": "#10b981",
+            },
+        )
+
+        self.assertTrue(result.get("success"))
+        self.assertTrue(result.get("created"))
+        self.assertIn("id", result)
+        self.assertEqual(result["name"], "Analysis")
+
+        # Verify in DB
+        nt = NodeType.objects.get(name="Analysis")
+        self.assertEqual(
+            nt.description,
+            "A recorded analysis with context, alternatives, and outcome",
+        )
+        self.assertEqual(nt.icon, "⚖️")
+        self.assertEqual(nt.color, "#10b981")
+
+    def test_create_node_type_idempotent(self):
+        # First creation
+        self.call_mcp_tool(
+            "create_node_type",
+            {"name": "Concept", "description": "Abstract idea"},
+        )
+
+        # Second call should not duplicate
+        result2 = self.call_mcp_tool(
+            "create_node_type",
+            {"name": "Concept", "description": "Updated description"},
+        )
+
+        self.assertFalse(result2.get("created"))  # already existed
+        self.assertEqual(result2["name"], "Concept")
+
+    def test_create_node_type_appears_in_ontology_resource(self):
+        self.call_mcp_tool(
+            "create_node_type",
+            {"name": "Experiment", "icon": "🧪"},
+        )
+
+        ontology = self.get_mcp_resource("knowkey://ontology/node_types")
+        self.assertIn("Experiment", str(ontology))
 
 
 if __name__ == "__main__":

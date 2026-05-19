@@ -5,7 +5,6 @@ High-quality prompts that guide the LLM in building excellent knowledge.
 """
 
 from fastmcp.prompts import base
-
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
 

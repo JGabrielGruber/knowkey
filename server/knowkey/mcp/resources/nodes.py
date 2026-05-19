@@ -7,7 +7,6 @@ Dynamic resources for reading specific nodes and their history.
 import json
 
 from fastmcp import FastMCP
-
 from knowkey.core.models import Node
 from knowkey.mcp.core import serialize_node
 from knowkey.mcp.server import mcp

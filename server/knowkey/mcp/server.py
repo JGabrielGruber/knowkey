@@ -52,6 +52,10 @@ well-connected knowledge graph from conversations and research.
 - Search, create, update, and link nodes via Tools
 - Use specialized Prompts for complex knowledge extraction tasks
 
+## Ontology Management
+- Use `create_node_type` when existing types don't fit well.
+- After creating a new type, you can immediately use it in `create_node`.
+
 Work deliberately. Prefer creating strong connections over many weak ones.
 """,
     version="0.2.0",  # Incremented for refactor

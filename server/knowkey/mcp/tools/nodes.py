@@ -9,21 +9,32 @@ from typing import Optional
 from asgiref.sync import async_to_sync
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
-from pydantic import Field
-
 from knowkey.mcp.core import create_knowkey_node, serialize_node
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
+from pydantic import Field
 
 
 @mcp.tool
 @sync_to_async()
 def create_node(
-    title: str = Field(..., min_length=3, description="Clear, descriptive title (3+ chars)"),
-    summary: str = Field(..., min_length=10, description="High-quality 1-3 sentence summary. Most important field for discoverability."),
-    node_type_name: str = Field(..., description="Exact existing NodeType name (e.g. 'Note', 'Person', 'Decision')"),
+    title: str = Field(
+        ..., min_length=3, description="Clear, descriptive title (3+ chars)"
+    ),
+    summary: str = Field(
+        ...,
+        min_length=10,
+        description="High-quality 1-3 sentence summary. Most important field for discoverability.",
+    ),
+    node_type_name: str = Field(
+        ...,
+        description="Exact existing NodeType name (e.g. 'Note', 'Person', 'Decision')",
+    ),
     content: str = Field(default="", description="Full content (Markdown supported)"),
-    tag_names: Optional[list[str]] = Field(default=None, description="List of tag names (will be created if they don't exist)"),
+    tag_names: Optional[list[str]] = Field(
+        default=None,
+        description="List of tag names (will be created if they don't exist)",
+    ),
     metadata: Optional[dict] = Field(default=None, description="Additional metadata"),
     author_name: str = Field(default="Grok", description="Author name for this node"),
     ctx: Context | None = None,
@@ -68,7 +79,9 @@ def update_node(
     summary: Optional[str] = Field(None, description="New summary"),
     content: Optional[str] = Field(None, description="New content"),
     node_type_name: Optional[str] = Field(None, description="New NodeType name"),
-    tag_names: Optional[list[str]] = Field(None, description="Replace tags with this list"),
+    tag_names: Optional[list[str]] = Field(
+        None, description="Replace tags with this list"
+    ),
     ctx: Context | None = None,
 ) -> dict:
     """
@@ -109,6 +122,7 @@ def update_node(
 
     if tag_names is not None:
         from knowkey.core.models import Tag
+
         tags = [Tag.objects.get_or_create(name=t)[0] for t in tag_names]
         node.tags.set(tags)
 
@@ -124,7 +138,9 @@ def update_node(
 @sync_to_async()
 def revert_node(
     node_id: str = Field(..., description="UUID of the live node"),
-    snapshot_id: str = Field(..., description="UUID of the historical snapshot to revert to"),
+    snapshot_id: str = Field(
+        ..., description="UUID of the historical snapshot to revert to"
+    ),
     ctx: Context | None = None,
 ) -> dict:
     """
@@ -172,7 +188,7 @@ def revert_node(
 @sync_to_async()
 def get_node(
     node_id: str = Field(..., description="UUID of the node to retrieve."),
-    ctx: Context | None = None
+    ctx: Context | None = None,
 ) -> dict:
     """
     Retrieve full details of one node (including relationships).
@@ -193,3 +209,60 @@ def get_node(
         return serialize_node(node, include_relationships=True)
     except Node.DoesNotExist:
         raise ToolError("Node not found.")
+
+
+@mcp.tool
+@sync_to_async()
+def create_node_type(
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Unique name for the NodeType (e.g. 'Decision', 'Concept', 'Person')",
+    ),
+    description: str = Field(
+        "", description="Clear description of what this node type represents"
+    ),
+    icon: str = Field("", description="Emoji or icon (e.g. '🧠', '📋', '👤')"),
+    color: str = Field(
+        "", description="Hex color or Tailwind color name (e.g. '#3b82f6', 'blue-500')"
+    ),
+    ctx: Context | None = None,
+) -> dict:
+    """
+    Create a new NodeType in the ontology.
+
+    Use this when the existing NodeTypes are not sufficient for high-quality knowledge modeling.
+    Be conservative — only create when truly needed.
+    """
+    from knowkey.core.models import NodeType
+
+    if ctx:
+        async_to_sync(ctx.info)(f"Creating NodeType: {name}")
+
+    try:
+        node_type, created = NodeType.objects.get_or_create(
+            name=name,
+            defaults={
+                "description": description,
+                "icon": icon,
+                "color": color,
+            },
+        )
+
+        return {
+            "success": True,
+            "created": created,
+            "id": str(node_type.id),
+            "name": node_type.name,
+            "description": node_type.description,
+            "icon": node_type.icon,
+            "color": node_type.color,
+            "message": (
+                "✅ NodeType created successfully."
+                if created
+                else "⚠️ NodeType already existed."
+            ),
+        }
+    except Exception as e:
+        raise ToolError(f"Failed to create NodeType: {str(e)}")

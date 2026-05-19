@@ -31,6 +31,7 @@ def sync_to_async(thread_sensitive: Optional[bool] = None):
 
     return decorator
 
+
 def async_to_sync():
     """
     Decorator factory that wraps an async function returning a sync function

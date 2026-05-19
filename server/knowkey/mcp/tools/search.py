@@ -8,12 +8,11 @@ from typing import Optional
 
 from asgiref.sync import async_to_sync
 from fastmcp.server.context import Context
-from pydantic import Field
-
 from knowkey.core.models import Node
 from knowkey.mcp.core import serialize_node_list
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
+from pydantic import Field
 
 
 @mcp.tool
@@ -21,7 +20,9 @@ from knowkey.mcp.utils import sync_to_async
 def search_nodes(
     query: str = Field(default="", description="Search term (title/summary/content)"),
     node_type_name: Optional[str] = Field(None, description="Filter by NodeType name"),
-    tag_names: Optional[list[str]] = Field(None, description="Must have ALL these tags"),
+    tag_names: Optional[list[str]] = Field(
+        None, description="Must have ALL these tags"
+    ),
     limit: int = Field(default=10, ge=1, le=50),
     include_all_versions: bool = Field(default=False, description="Usually keep False"),
     ctx: Context | None = None,
@@ -48,6 +49,7 @@ def search_nodes(
 
     if query:
         from django.db.models import Q
+
         qs = qs.filter(
             Q(title__icontains=query)
             | Q(summary__icontains=query)

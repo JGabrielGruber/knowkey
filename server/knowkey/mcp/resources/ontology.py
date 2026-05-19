@@ -7,7 +7,6 @@ Exposes Knowkey's type system and guidance to the LLM.
 import json
 
 from fastmcp import FastMCP
-
 from knowkey.core.models import Node, NodeType, RelationshipType, Tag
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
