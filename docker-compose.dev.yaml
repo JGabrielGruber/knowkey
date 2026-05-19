@@ -76,7 +76,7 @@ services:
       context: ./server/
       dockerfile: Dockerfile
     container_name: knowkey-mcp
-    command: python manage.py run_mcp_server --host 0.0.0.0 --port 8001
+    command: python manage.py run_mcp_server --host 0.0.0.0 --port 8001 --transport streamable-http
     depends_on:
       - postgres
       - redis
