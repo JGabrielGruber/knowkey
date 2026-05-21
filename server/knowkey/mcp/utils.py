@@ -1,3 +1,5 @@
+import json
+import re
 from functools import wraps
 from typing import Any, Callable, Optional
 
@@ -54,3 +56,71 @@ def async_to_sync():
         return sync_wrapper
 
     return decorator
+
+
+def clean_string_value(value: Any) -> Any:
+    """Remove common LLM quoting mistakes from string values."""
+    if not isinstance(value, str):
+        return value
+
+    # Remove outer quotes if the whole string is wrapped
+    # e.g. "\"actual-value\"" → "actual-value"
+    value = value.strip()
+
+    # Remove leading and trailing escaped quotes
+    if value.startswith('"') and value.endswith('"') and len(value) > 1:
+        value = value[1:-1].strip()
+    if value.startswith("'") and value.endswith("'") and len(value) > 1:
+        value = value[1:-1].strip()
+
+    # Fix double-escaped quotes inside
+    value = value.replace('\\"', '"').replace("\\'", "'")
+
+    return value
+
+
+def clean_inputs(func: Callable) -> Callable:
+    """
+    Decorator to clean JSON inputs coming from LLMs.
+    Should be used on tools that receive `data`, `goal`, `session_id`, etc.
+    """
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        # Clean common top-level fields
+        for key in ["goal", "session_id", "action"]:
+            if key in kwargs and isinstance(kwargs[key], str):
+                kwargs[key] = clean_string_value(kwargs[key])
+
+        # Deep clean the `data` dict (most common source of issues)
+        if "data" in kwargs and isinstance(kwargs["data"], dict):
+            kwargs["data"] = _clean_dict_recursively(kwargs["data"])
+
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
+def _clean_dict_recursively(d: dict) -> dict:
+    """Recursively clean all string values in a dict (including nested)."""
+    cleaned = {}
+    for k, v in d.items():
+        if isinstance(v, str):
+            cleaned[k] = clean_string_value(v)
+        elif isinstance(v, dict):
+            cleaned[k] = _clean_dict_recursively(v)
+        elif isinstance(v, list):
+            cleaned[k] = [_clean_value_recursively(item) for item in v]
+        else:
+            cleaned[k] = v
+    return cleaned
+
+
+def _clean_value_recursively(value: Any) -> Any:
+    if isinstance(value, str):
+        return clean_string_value(value)
+    elif isinstance(value, dict):
+        return _clean_dict_recursively(value)
+    elif isinstance(value, list):
+        return [_clean_value_recursively(item) for item in value]
+    return value
