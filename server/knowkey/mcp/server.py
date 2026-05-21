@@ -10,12 +10,15 @@ Run with:
     python manage.py run_mcp_server --transport stdio
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
 import django
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
+
+logging.basicConfig(level=logging.DEBUG)
 
 # =============================================================================
 # Django Setup
@@ -85,7 +88,7 @@ async def lifespan(app):
 from knowkey.mcp.resources import ontology as ontology_resources  # noqa: F401
 
 # Compose
-from knowkey.mcp.compose import knowledge_wizard as knowledge_wizard_tool  # noqa: F401
+from knowkey.mcp.compose import knowledge as knowledge_tool  # noqa: F401
 
 # Prompts
 from knowkey.mcp.prompts import knowledge as knowledge_prompts  # noqa: F401
