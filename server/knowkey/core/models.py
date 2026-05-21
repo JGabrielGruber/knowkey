@@ -65,6 +65,24 @@ class NodeType(models.Model):
 
     class Meta:
         ordering = ["name"]
+        verbose_name = "Node Type"
+        verbose_name_plural = "Node Types"
+
+    def __str__(self):
+        return self.name
+
+
+class RelationshipType(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    icon = models.CharField(max_length=50, blank=True)
+    color = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Relationship Type"
+        verbose_name_plural = "Relationship Types"
 
     def __str__(self):
         return self.name
@@ -248,8 +266,10 @@ class NodeRelationship(models.Model):
         Node, on_delete=models.CASCADE, related_name="incoming_relationships"
     )
 
-    relationship_type = models.CharField(
-        max_length=50, choices=RelationshipType.choices
+    relationship_type = models.ForeignKey(
+        RelationshipType,
+        on_delete=models.PROTECT,
+        related_name="relationships",
     )
     weight = models.FloatField(default=1.0)
 
@@ -261,7 +281,9 @@ class NodeRelationship(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.source.title} → {self.get_relationship_type_display()} → {self.target.title}"
+        return (
+            f"{self.source.title} → {self.relationship_type.name} → {self.target.title}"
+        )
 
     def clean(self):
         if self.source.version_of is not None or self.target.version_of is not None:

@@ -15,6 +15,7 @@ from knowkey.core.models import (
     Node,
     NodeRelationship,
     NodeType,
+    RelationshipType,
     Tag,
 )
 from knowkey.mcp.utils import sanitize_name, sanitize_tag_name, standardize_tags
@@ -187,24 +188,46 @@ def revert_node(node_id: str, snapshot_id: str) -> Node:
 
 
 @transaction.atomic
+def create_relationship_type(
+    name: str,
+    description: str = "",
+    icon: str = "",
+    color: str = "",
+) -> RelationshipType:
+    """Create or get a RelationshipType."""
+    name = sanitize_name(name)
+    return RelationshipType.objects.get_or_create(
+        name=name,
+        defaults={
+            "description": description,
+            "icon": icon,
+            "color": color,
+        },
+    )[0]
+
+
+@transaction.atomic
 def create_relationship(
     source_id: str,
     target_id: str,
-    relationship_type: str,
+    relationship_type_name: str,
     weight: float = 1.0,
     author_name: str = "Grok",
 ) -> NodeRelationship:
-    """Create relationship between two live nodes only."""
+    """Create relationship between two live nodes."""
     source = Node.objects.get(id=source_id)
     target = Node.objects.get(id=target_id)
 
     if not source.is_latest or not target.is_latest:
         raise ValueError("Both source and target must be live nodes.")
 
+    relationship_type_name = sanitize_name(relationship_type_name)
     author_name = sanitize_name(author_name, title_case=True)
-    author = get_or_create_author(author_name)
 
-    relationship_type = sanitize_tag_name(relationship_type)
+    relationship_type = RelationshipType.objects.get(
+        name__iexact=relationship_type_name
+    )
+    author = get_or_create_author(author_name)
 
     return NodeRelationship.objects.create(
         source=source,

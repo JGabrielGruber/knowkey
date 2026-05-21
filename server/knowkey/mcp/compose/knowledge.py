@@ -22,11 +22,12 @@ from knowkey.mcp.core import (
     create_node,
     create_node_type,
     create_relationship,
+    create_relationship_type,
     search_nodes,
     update_node,
 )
 from knowkey.mcp.server import mcp
-from knowkey.mcp.utils import clean_inputs, sync_to_async
+from knowkey.mcp.utils import clean_inputs, sanitize_name, sync_to_async
 from pydantic import BaseModel, Field, field_validator
 
 # =============================================================================
@@ -79,7 +80,7 @@ class RelationshipInput(BaseModel):
     target_id: str | None = None
     target_node_id: str | None = None
 
-    relationship_type: str
+    relationship_type_name: str
     weight: float = 1.0
 
     @field_validator("source_id", "target_id", mode="before")
@@ -143,12 +144,20 @@ def do_create_node_type(
 
 
 @sync_to_async()
+def do_create_relationship_type(
+    name: str, description: str = "", icon: str = "", color: str = ""
+):
+    rt = create_relationship_type(
+        name=name, description=description, icon=icon, color=color
+    )
+    return {"success": True, "name": rt.name, "id": str(rt.id)}
+
+
+@sync_to_async()
 def do_create_or_update_node(node_input: NodeInput):
     """Auto-create NodeType + default tags"""
-    try:
-        NodeType.objects.get(name__iexact=node_input.node_type_name)
-    except NodeType.DoesNotExist:
-        create_node_type(name=node_input.node_type_name)
+
+    create_node_type(name=node_input.node_type_name)
 
     # Auto-add source tag
     if not node_input.tag_names:
@@ -180,26 +189,20 @@ def do_create_or_update_node(node_input: NodeInput):
 
 
 @sync_to_async()
-def do_create_relationship(rel: RelationshipInput):
-    source_id = rel.source_id or rel.source_node_id
-    target_id = rel.target_id or rel.target_node_id
+def do_create_relationship(relationship: RelationshipInput):
+    source_id = relationship.source_id or relationship.source_node_id
+    target_id = relationship.target_id or relationship.target_node_id
 
     if not source_id or not target_id:
         raise ValueError("Both source and target IDs are required")
 
-    # Strict validation
-    valid_types = [choice[0] for choice in RelationshipType.choices]
-    if rel.relationship_type not in valid_types:
-        raise ValueError(
-            f"Invalid relationship_type '{rel.relationship_type}'. "
-            f"Valid options: {valid_types}"
-        )
+    create_relationship_type(name=relationship.relationship_type_name)
 
     create_relationship(
         source_id=source_id,
         target_id=target_id,
-        relationship_type=rel.relationship_type,
-        weight=rel.weight,
+        relationship_type_name=relationship.relationship_type_name,
+        weight=relationship.weight,
     )
     return {"success": True}
 
@@ -244,6 +247,7 @@ def get_steps() -> list[dict]:
             "description": "Connect nodes with meaningful relationships",
             "allowed_actions": [
                 "search_nodes",
+                "create_relationship_type",
                 "add_relationship",
                 "continue",
                 "previous",
@@ -348,6 +352,10 @@ async def compose_knowledge(
             result = await do_create_node_type(**(data or {}))
             message = "NodeType ready."
 
+        elif action == "create_relationship_type":
+            result = await do_create_relationship_type(**(data or {}))
+            message = "RelationshipType ready."
+
         elif action == "set_main_node" and current_step["id"] == "create_main_node":
             node_input = NodeInput(**data)
             result = await do_create_or_update_node(node_input)
@@ -370,7 +378,7 @@ async def compose_knowledge(
             rel_input = RelationshipInput(**data)
             result = await do_create_relationship(rel_input)
             state.relationships.append(rel_input.model_dump())
-            message = f"✅ Relationship created: {rel_input.relationship_type}"
+            message = f"✅ Relationship created: {rel_input.relationship_type_name}"
 
         elif action == "confirm" and current_step["id"] == "review_and_commit":
             delete_session(session_id)
