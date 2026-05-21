@@ -1,23 +1,23 @@
 """
 compose/knowledge.py
 ====================
-Improved multi-turn Knowledge Composition Tool.
+Improved multi-turn Knowledge Composition Tool (stateful).
 
-Now features:
-- Explicit per-step actions
-- "continue" action to advance steps
-- Very transparent state + guidance for the agent
-- Strict but friendly flow
+Latest improvements:
+- Stronger tags support (auto-adds "source:compose")
+- Better guidance with realistic examples
+- Improved error messages for relationship types
 """
 
 import json
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 import redis
 from django.conf import settings
 from fastmcp.server.context import Context
+from knowkey.core.models import NodeType, RelationshipType
 from knowkey.mcp.core import (
     create_node,
     create_node_type,
@@ -27,7 +27,7 @@ from knowkey.mcp.core import (
 )
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import clean_inputs, sync_to_async
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # =============================================================================
 # Redis Session
@@ -42,7 +42,7 @@ def _session_key(session_id: str) -> str:
 
 def create_session(state: dict) -> str:
     session_id = str(uuid.uuid4())
-    r.setex(_session_key(session_id), 3600, json.dumps(state))  # 1h TTL
+    r.setex(_session_key(session_id), 3600, json.dumps(state))
     return session_id
 
 
@@ -60,32 +60,48 @@ def delete_session(session_id: str):
 
 
 # =============================================================================
-# Models
+# Input Models
 # =============================================================================
 class NodeInput(BaseModel):
     id: str | None = Field(
-        default=None, description="Node ID to update, or None to create new"
+        default=None, description="Node ID to update (None = create new)"
     )
-    title: str
-    summary: str
+    title: str = Field(..., min_length=3)
+    summary: str = Field(..., min_length=10)
     node_type_name: str
     content: str = ""
     tag_names: list[str] = Field(default_factory=list)
 
 
 class RelationshipInput(BaseModel):
-    source_id: str
-    target_id: str
+    source_id: str | None = None
+    source_node_id: str | None = None
+    target_id: str | None = None
+    target_node_id: str | None = None
+
     relationship_type: str
     weight: float = 1.0
 
+    @field_validator("source_id", "target_id", mode="before")
+    @classmethod
+    def normalize_ids(cls, v, info):
+        if v is None:
+            alias = (
+                "source_node_id" if info.field_name == "source_id" else "target_node_id"
+            )
+            return info.data.get(alias)
+        return v
 
+
+# =============================================================================
+# State
+# =============================================================================
 @dataclass
 class ComposeState:
     goal: str
     transcript: str = ""
     current_step_index: int = 0
-    main_node: dict | None = None  # final NodeInput dict
+    main_node: dict | None = None
     related_nodes: list[dict] = field(default_factory=list)
     relationships: list[dict] = field(default_factory=list)
 
@@ -98,28 +114,46 @@ class ComposeState:
 
     def get_progress(self) -> str:
         main = "✅" if self.main_node else "⏳"
-        rel = len(self.related_nodes)
-        rels = len(self.relationships)
-        return f"Main: {main} | Related nodes: {rel} | Relationships: {rels}"
+        return f"Main: {main} | Related: {len(self.related_nodes)} | Relationships: {len(self.relationships)}"
 
 
 # =============================================================================
-# Core Action Helpers (async-safe)
+# Core Helpers
 # =============================================================================
 @sync_to_async()
 def do_search_nodes(query: str = "", limit: int = 8):
     nodes = search_nodes(query=query, limit=limit)
-    return [{"id": str(n.id), "title": n.title, "summary": n.summary} for n in nodes]
+    return [
+        {
+            "id": str(n.id),
+            "title": n.title,
+            "summary": n.summary,
+            "node_type": n.node_type.name,
+        }
+        for n in nodes
+    ]
 
 
 @sync_to_async()
-def do_create_node_type(name: str, description: str = "", icon: str = ""):
-    nt = create_node_type(name=name, description=description, icon=icon)
+def do_create_node_type(
+    name: str, description: str = "", icon: str = "", color: str = ""
+):
+    nt = create_node_type(name=name, description=description, icon=icon, color=color)
     return {"success": True, "name": nt.name, "id": str(nt.id)}
 
 
 @sync_to_async()
 def do_create_or_update_node(node_input: NodeInput):
+    """Auto-create NodeType + default tags"""
+    try:
+        NodeType.objects.get(name__iexact=node_input.node_type_name)
+    except NodeType.DoesNotExist:
+        create_node_type(name=node_input.node_type_name)
+
+    # Auto-add source tag
+    if not node_input.tag_names:
+        node_input.tag_names = ["source:compose"]
+
     if node_input.id:
         node = update_node(
             node_id=node_input.id,
@@ -147,9 +181,23 @@ def do_create_or_update_node(node_input: NodeInput):
 
 @sync_to_async()
 def do_create_relationship(rel: RelationshipInput):
+    source_id = rel.source_id or rel.source_node_id
+    target_id = rel.target_id or rel.target_node_id
+
+    if not source_id or not target_id:
+        raise ValueError("Both source and target IDs are required")
+
+    # Strict validation
+    valid_types = [choice[0] for choice in RelationshipType.choices]
+    if rel.relationship_type not in valid_types:
+        raise ValueError(
+            f"Invalid relationship_type '{rel.relationship_type}'. "
+            f"Valid options: {valid_types}"
+        )
+
     create_relationship(
-        source_id=rel.source_id,
-        target_id=rel.target_id,
+        source_id=source_id,
+        target_id=target_id,
         relationship_type=rel.relationship_type,
         weight=rel.weight,
     )
@@ -157,7 +205,7 @@ def do_create_relationship(rel: RelationshipInput):
 
 
 # =============================================================================
-# Step Configuration
+# Steps + Guidance
 # =============================================================================
 def get_steps() -> list[dict]:
     return [
@@ -172,7 +220,7 @@ def get_steps() -> list[dict]:
                 "continue",
                 "cancel",
             ],
-            "can_continue": lambda state: state.main_node is not None,
+            "can_continue": lambda s: s.main_node is not None,
             "can_previous": False,
         },
         {
@@ -187,7 +235,7 @@ def get_steps() -> list[dict]:
                 "previous",
                 "cancel",
             ],
-            "can_continue": lambda state: True,  # optional
+            "can_continue": lambda s: True,
             "can_previous": True,
         },
         {
@@ -201,7 +249,7 @@ def get_steps() -> list[dict]:
                 "previous",
                 "cancel",
             ],
-            "can_continue": lambda state: True,
+            "can_continue": lambda s: True,
             "can_previous": True,
         },
         {
@@ -209,7 +257,7 @@ def get_steps() -> list[dict]:
             "title": "4. Review & Commit",
             "description": "Review everything and finish",
             "allowed_actions": ["confirm", "previous", "cancel"],
-            "can_continue": lambda state: False,
+            "can_continue": lambda s: False,
             "can_previous": True,
         },
     ]
@@ -227,16 +275,12 @@ async def compose_knowledge(
     session_id: str | None = Field(
         default=None, description="Session ID from previous response"
     ),
-    action: str = Field(
-        default="",
-        description="Action to perform: search_nodes, set_main_node, add_related_node, add_relationship, continue, previous, cancel, confirm...",
-    ),
-    data: dict | None = Field(default=None, description="Data payload for the action"),
+    action: str = Field("", description="Action to perform"),
+    data: dict | None = Field(default=None, description="Data for the action"),
     ctx: Context | None = None,
 ) -> dict:
-    """Stateful, guided multi-turn knowledge composition tool with explicit flow."""
+    """Stateful guided multi-turn knowledge composition tool."""
 
-    # ── Load / Create session ─────────────────────────────────────
     if session_id:
         state_dict = load_session(session_id)
         if not state_dict:
@@ -248,17 +292,17 @@ async def compose_knowledge(
         state = ComposeState(goal=goal)
         session_id = create_session(state.to_dict())
         if ctx:
-            await ctx.info(f"[compose] New session created: {session_id}")
+            await ctx.info(f"[compose] New session: {session_id}")
 
     steps = get_steps()
     current_step = steps[state.current_step_index]
 
     if ctx:
         await ctx.info(
-            f"[compose] Step {state.current_step_index+1}/4 — {current_step['id']}"
+            f"[compose] Step {state.current_step_index + 1}/4 — {current_step['id']}"
         )
 
-    # ── Handle navigation / special actions first ─────────────────
+    # Navigation
     if action == "cancel":
         delete_session(session_id)
         return {"success": True, "message": "Session cancelled."}
@@ -266,8 +310,12 @@ async def compose_knowledge(
     if action == "previous" and current_step.get("can_previous"):
         state.current_step_index = max(0, state.current_step_index - 1)
         save_session(session_id, state.to_dict())
-        new_step = steps[state.current_step_index]
-        return _build_response(session_id, state, new_step, "Moved to previous step.")
+        return _build_response(
+            session_id,
+            state,
+            steps[state.current_step_index],
+            "Moved to previous step.",
+        )
 
     if action == "continue":
         if not current_step.get("can_continue", lambda s: True)(state):
@@ -275,28 +323,30 @@ async def compose_knowledge(
                 session_id,
                 state,
                 current_step,
-                "Cannot continue yet — please complete the current step first (e.g. create main node).",
+                "Cannot continue yet — complete current step first.",
                 error=True,
             )
         state.current_step_index = min(len(steps) - 1, state.current_step_index + 1)
         save_session(session_id, state.to_dict())
-        new_step = steps[state.current_step_index]
         return _build_response(
-            session_id, state, new_step, f"✅ Advanced to step: {new_step['title']}"
+            session_id,
+            state,
+            steps[state.current_step_index],
+            f"Advanced to {steps[state.current_step_index]['title']}",
         )
 
-    # ── Step-specific actions ─────────────────────────────────────
+    # Step actions
     result = None
     message = ""
 
     try:
         if action == "search_nodes":
             result = await do_search_nodes(**(data or {}))
-            message = "Search results returned."
+            message = "Search completed."
 
         elif action == "create_node_type":
             result = await do_create_node_type(**(data or {}))
-            message = "NodeType created (or already existed)."
+            message = "NodeType ready."
 
         elif action == "set_main_node" and current_step["id"] == "create_main_node":
             node_input = NodeInput(**data)
@@ -335,7 +385,7 @@ async def compose_knowledge(
                 session_id,
                 state,
                 current_step,
-                f"Action '{action}' not supported in step '{current_step['id']}'",
+                f"Action '{action}' not available in this step.",
                 error=True,
             )
 
@@ -357,7 +407,6 @@ def _build_response(
     result: Any = None,
     error: bool = False,
 ) -> dict:
-    """Build rich, transparent response for the agent."""
     progress = state.get_progress()
 
     return {
@@ -376,9 +425,13 @@ def _build_response(
         "message": message,
         "result": result,
         "guidance": (
-            f"Current progress: {progress}\n"
-            f"You are in step '{current_step['title']}'. "
-            f"Use one of the allowed_actions above. "
-            f"When ready, call action='continue' to move forward."
+            f"Progress: {progress}\n"
+            f"You are in: **{current_step['title']}**\n\n"
+            "Recommended actions:\n"
+            "• search_nodes → find existing knowledge\n"
+            "• set_main_node / add_related_node → include tag_names if useful\n"
+            "• add_relationship → use only valid types from ontology\n\n"
+            "Example for current step:\n"
+            "{'title': 'Gabe Newell', 'summary': '...', 'node_type_name': 'Person', 'tag_names': ['founder', 'valve']}"
         ),
     }
