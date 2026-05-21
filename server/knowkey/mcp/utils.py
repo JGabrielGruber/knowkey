@@ -1,7 +1,7 @@
 import json
 import re
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional
 
 from asgiref.sync import async_to_sync as _async_to_sync
 from asgiref.sync import sync_to_async as _sync_to_async
@@ -124,3 +124,67 @@ def _clean_value_recursively(value: Any) -> Any:
     elif isinstance(value, list):
         return [_clean_value_recursively(item) for item in value]
     return value
+
+
+def sanitize_name(name: str, *, title_case: bool = False) -> str:
+    """
+    Sanitize and standardize names for NodeTypes, Tags, etc.
+
+    Rules:
+    - Strip whitespace
+    - Remove dangerous/redundant characters
+    - Normalize multiple spaces
+    - Optional: Convert to Title Case
+    """
+    if not name or not isinstance(name, str):
+        return ""
+
+    # Basic cleaning
+    name = name.strip()
+    name = re.sub(r"\s+", " ", name)  # normalize multiple spaces
+    name = re.sub(
+        r"[^\w\s\-\.\,\&]", "", name
+    )  # keep letters, numbers, space, -, ., ,, &
+
+    if title_case:
+        name = name.title()
+
+    return name.strip()
+
+
+def sanitize_tag_name(tag: str) -> str:
+    """
+    Standardize tag names (recommended: lowercase with hyphens).
+    Example: "Elon Musk" → "elon-musk"
+    """
+    if not tag:
+        return ""
+
+    cleaned = sanitize_name(tag, title_case=False).lower()
+    # Replace spaces and underscores with hyphens
+    cleaned = re.sub(r"[\s_]+", "-", cleaned)
+    # Remove multiple hyphens
+    cleaned = re.sub(r"-+", "-", cleaned)
+    return cleaned.strip("-")
+
+
+def standardize_tags(tag_names: List[str]) -> List[str]:
+    """Clean and deduplicate a list of tags."""
+    if not tag_names:
+        return []
+
+    cleaned = []
+    seen = set()
+
+    for tag in tag_names:
+        sanitized = sanitize_tag_name(tag)
+        if sanitized and sanitized not in seen:
+            seen.add(sanitized)
+            cleaned.append(sanitized)
+
+    return cleaned
+
+
+def sanitize_node_type_name(name: str) -> str:
+    """NodeType names are usually Title Case."""
+    return sanitize_name(name, title_case=True)

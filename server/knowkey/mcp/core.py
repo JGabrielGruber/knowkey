@@ -17,10 +17,12 @@ from knowkey.core.models import (
     NodeType,
     Tag,
 )
+from knowkey.mcp.utils import sanitize_name, sanitize_tag_name, standardize_tags
 
 
 def get_or_create_author(name: str = "Grok", author_type: str = "agent") -> Author:
     """Get or create an Author for MCP operations."""
+    author_type = sanitize_tag_name(author_type)
     author, _ = Author.objects.get_or_create(
         name=name,
         defaults={"author_type": author_type},
@@ -103,8 +105,13 @@ def create_node(
     metadata.setdefault("source", "mcp")
     metadata.setdefault("created_via_mcp", True)
 
+    node_type_name = sanitize_name(node_type_name, title_case=True)
+    author_name = sanitize_name(author_name, title_case=True)
+
     node_type = NodeType.objects.get(name__iexact=node_type_name)
     author = get_or_create_author(author_name)
+
+    title = sanitize_name(title)
 
     node = Node.objects.create(
         title=title,
@@ -116,6 +123,8 @@ def create_node(
     )
 
     if tag_names:
+        tag_names = standardize_tags(tag_names)
+
         tags = [Tag.objects.get_or_create(name=t)[0] for t in tag_names]
         node.tags.set(tags)
 
@@ -137,6 +146,7 @@ def update_node(
 
     changed = False
     if title is not None:
+        title = sanitize_name(title)
         node.title = title
         changed = True
     if summary is not None:
@@ -150,6 +160,7 @@ def update_node(
         changed = True
 
     if node_type_name:
+        node_type_name = sanitize_name(node_type_name, title_case=True)
         node.node_type = NodeType.objects.get(name__iexact=node_type_name)
         changed = True
 
@@ -157,6 +168,7 @@ def update_node(
         node.save()  # triggers versioning
 
     if tag_names is not None:
+        tag_names = standardize_tags(tag_names)
         tags = [Tag.objects.get_or_create(name=t)[0] for t in tag_names]
         node.tags.set(tags)
 
@@ -189,7 +201,10 @@ def create_relationship(
     if not source.is_latest or not target.is_latest:
         raise ValueError("Both source and target must be live nodes.")
 
+    author_name = sanitize_name(author_name, title_case=True)
     author = get_or_create_author(author_name)
+
+    relationship_type = sanitize_tag_name(relationship_type)
 
     return NodeRelationship.objects.create(
         source=source,
@@ -207,6 +222,7 @@ def create_node_type(
     color: str = "",
 ) -> NodeType:
     """Create or get NodeType."""
+    name = sanitize_name(name, title_case=True)
     return NodeType.objects.get_or_create(
         name=name,
         defaults={"description": description, "icon": icon, "color": color},
@@ -248,9 +264,11 @@ def search_nodes(
         )
 
     if node_type_name:
+        node_type_name = sanitize_name(node_type_name, title_case=True)
         qs = qs.filter(node_type__name__iexact=node_type_name)
 
     if tag_names:
+        tag_names = standardize_tags(tag_names)
         for tag in tag_names:
             qs = qs.filter(tags__name__iexact=tag)
 
