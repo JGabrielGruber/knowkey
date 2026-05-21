@@ -7,7 +7,7 @@ Create typed connections between live nodes only.
 from asgiref.sync import async_to_sync
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
-from knowkey.core.models import Node, NodeRelationship, RelationshipType
+from knowkey.mcp.core import create_relationship as core_create_relationship
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
 from pydantic import Field
@@ -23,6 +23,9 @@ def create_relationship(
     ),
     weight: float = Field(
         default=1.0, ge=0.0, le=10.0, description="Relationship strength"
+    ),
+    author_name: str = Field(
+        default="Grok", description="Author name for this relationship"
     ),
     ctx: Context | None = None,
 ) -> dict:
@@ -42,33 +45,19 @@ def create_relationship(
         )
 
     try:
-        source = Node.objects.get(id=source_node_id)
-        target = Node.objects.get(id=target_node_id)
-    except Node.DoesNotExist:
-        raise ToolError("Source or target node not found.")
+        rel = core_create_relationship(
+            source_id=source_node_id,
+            target_id=target_node_id,
+            relationship_type=relationship_type,
+            weight=weight,
+            author_name=author_name,
+        )
 
-    if not source.is_latest or not target.is_latest:
-        raise ToolError("Both source and target must be live nodes.")
-
-    valid_types = [c[0] for c in RelationshipType.choices]
-    if relationship_type not in valid_types:
-        raise ToolError(f"Invalid relationship_type. Valid: {valid_types}")
-
-    author = __import__(
-        "knowkey.mcp.core", fromlist=["get_or_create_author"]
-    ).get_or_create_author()
-
-    rel = NodeRelationship.objects.create(
-        source=source,
-        target=target,
-        relationship_type=relationship_type,
-        weight=weight,
-        created_by=author,
-    )
-
-    return {
-        "success": True,
-        "id": str(rel.id),
-        "relationship_type": relationship_type,
-        "message": "✅ Relationship created between live nodes.",
-    }
+        return {
+            "success": True,
+            "id": str(rel.id),
+            "relationship_type": relationship_type,
+            "message": "✅ Relationship created between live nodes.",
+        }
+    except Exception as e:
+        raise ToolError(f"Failed to updaet node: {str(e)}")

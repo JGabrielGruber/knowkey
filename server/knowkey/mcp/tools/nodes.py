@@ -9,7 +9,12 @@ from typing import Optional
 from asgiref.sync import async_to_sync
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
-from knowkey.mcp.core import create_knowkey_node, serialize_node
+from knowkey.mcp.core import create_node as core_create_node
+from knowkey.mcp.core import create_node_type as core_create_node_type
+from knowkey.mcp.core import get_node as core_get_node
+from knowkey.mcp.core import revert_node as core_revert_node
+from knowkey.mcp.core import serialize_node
+from knowkey.mcp.core import update_node as core_update_node
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
 from pydantic import Field
@@ -51,7 +56,7 @@ def create_node(
         async_to_sync(ctx.info)(f"Creating node: {title}")
 
     try:
-        node = create_knowkey_node(
+        node = core_create_node(
             title=title,
             summary=summary,
             content=content,
@@ -90,48 +95,28 @@ def update_node(
     This automatically creates a historical snapshot of the old state.
     Use when you want to improve or correct existing knowledge.
     """
-    from knowkey.core.models import Node, NodeType
 
     if ctx:
         async_to_sync(ctx.info)(f"Updating node {node_id}")
 
     try:
-        node = Node.objects.get(id=node_id, version_of__isnull=True)
-    except Node.DoesNotExist:
-        raise ToolError("Node not found or is not the live version.")
+        node = core_update_node(
+            node_id=node_id,
+            title=title,
+            summary=summary,
+            content=content,
+            node_type_name=node_type_name,
+            tag_names=tag_names,
+        )
 
-    changed = False
-    if title is not None:
-        node.title = title
-        changed = True
-    if summary is not None:
-        node.summary = summary
-        changed = True
-    if content is not None:
-        node.content = content
-        changed = True
-    if node_type_name:
-        try:
-            node.node_type = NodeType.objects.get(name__iexact=node_type_name)
-            changed = True
-        except NodeType.DoesNotExist:
-            raise ToolError(f"NodeType '{node_type_name}' not found.")
-
-    if changed:
-        node.save()  # Triggers versioning signal
-
-    if tag_names is not None:
-        from knowkey.core.models import Tag
-
-        tags = [Tag.objects.get_or_create(name=t)[0] for t in tag_names]
-        node.tags.set(tags)
-
-    return {
-        "success": True,
-        "id": str(node.id),
-        "new_version_number": node.version_number,
-        "message": "✅ Node updated. Previous version saved as snapshot.",
-    }
+        return {
+            "success": True,
+            "id": str(node.id),
+            "new_version_number": node.version_number,
+            "message": "✅ Node updated. Previous version saved as snapshot.",
+        }
+    except Exception as e:
+        raise ToolError(f"Failed to update node: {str(e)}")
 
 
 @mcp.tool
@@ -158,20 +143,12 @@ def revert_node(
 
     This is a powerful self-correction tool.
     """
-    from knowkey.core.models import Node
 
     if ctx:
         async_to_sync(ctx.info)(f"Reverting {node_id} to snapshot {snapshot_id}")
 
     try:
-        live_node = Node.objects.get(id=node_id, version_of__isnull=True)
-        snapshot = Node.objects.get(id=snapshot_id, version_of=live_node)
-    except Node.DoesNotExist:
-        raise ToolError("Live node or valid snapshot not found.")
-
-    try:
-        live_node.revert_to(snapshot, bypass_versioning=False)
-        live_node.save()
+        live_node = core_revert_node(node_id=node_id, snapshot_id=snapshot_id)
 
         return {
             "success": True,
@@ -201,11 +178,8 @@ def get_node(
         async_to_sync(ctx.info)(f"Fetching node {node_id}")
 
     try:
-        node = (
-            Node.objects.select_related("node_type", "author")
-            .prefetch_related("tags", "outgoing_relationships__target")
-            .get(id=node_id)
-        )
+        node = core_get_node(node_id=node_id)
+
         return serialize_node(node, include_relationships=True)
     except Node.DoesNotExist:
         raise ToolError("Node not found.")
@@ -235,34 +209,25 @@ def create_node_type(
     Use this when the existing NodeTypes are not sufficient for high-quality knowledge modeling.
     Be conservative — only create when truly needed.
     """
-    from knowkey.core.models import NodeType
-
     if ctx:
         async_to_sync(ctx.info)(f"Creating NodeType: {name}")
 
     try:
-        node_type, created = NodeType.objects.get_or_create(
+        node_type = core_create_node_type(
             name=name,
-            defaults={
-                "description": description,
-                "icon": icon,
-                "color": color,
-            },
+            description=description,
+            icon=icon,
+            color=color,
         )
 
         return {
             "success": True,
-            "created": created,
             "id": str(node_type.id),
             "name": node_type.name,
             "description": node_type.description,
             "icon": node_type.icon,
             "color": node_type.color,
-            "message": (
-                "✅ NodeType created successfully."
-                if created
-                else "⚠️ NodeType already existed."
-            ),
+            "message": "✅ NodeType created successfully.",
         }
     except Exception as e:
         raise ToolError(f"Failed to create NodeType: {str(e)}")

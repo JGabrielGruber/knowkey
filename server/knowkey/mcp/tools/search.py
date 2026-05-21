@@ -9,6 +9,7 @@ from typing import Optional
 from asgiref.sync import async_to_sync
 from fastmcp.server.context import Context
 from knowkey.core.models import Node
+from knowkey.mcp.core import search_nodes as core_search_nodes
 from knowkey.mcp.core import serialize_node_list
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
@@ -42,26 +43,11 @@ def search_nodes(
     if ctx:
         async_to_sync(ctx.info)(f"Searching: '{query}'")
 
-    qs = Node.objects.select_related("node_type").prefetch_related("tags")
-
-    if not include_all_versions:
-        qs = qs.filter(version_of__isnull=True)
-
-    if query:
-        from django.db.models import Q
-
-        qs = qs.filter(
-            Q(title__icontains=query)
-            | Q(summary__icontains=query)
-            | Q(content__icontains=query)
-        )
-
-    if node_type_name:
-        qs = qs.filter(node_type__name__iexact=node_type_name)
-
-    if tag_names:
-        for tag in tag_names:
-            qs = qs.filter(tags__name__iexact=tag)
-
-    qs = qs.distinct().order_by("-updated_at")[:limit]
-    return serialize_node_list(list(qs))
+    nodes = core_search_nodes(
+        query=query,
+        node_type_name=node_type_name,
+        tag_names=tag_names,
+        limit=limit,
+        include_all_versions=include_all_versions,
+    )
+    return serialize_node_list(nodes=nodes)

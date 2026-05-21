@@ -3,38 +3,40 @@ compose/knowledge_wizard.py
 ===========================
 Sequential Knowledge Wizard with per-step structured models.
 
-This is an interactive, step-by-step compose tool that guides an agent
-through high-quality knowledge ingestion into Knowkey.
+Uses core business logic directly (no internal tool calls).
 """
 
 from dataclasses import dataclass, field
 from typing import Literal
 
+from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
 from fastmcp.server.sampling import SamplingTool
+from knowkey.mcp.core import (
+    create_node,
+    create_node_type,
+    create_relationship,
+    search_nodes,
+    update_node,
+)
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import sync_to_async
 from pydantic import BaseModel, Field
 
 # =============================================================================
-# Shared Input Models
+# Input Models
 # =============================================================================
 
 
 class NodeInput(BaseModel):
-    """Input model for creating or updating a node."""
-
     id: str | None = Field(
-        default=None,
-        description="If provided, the node will be updated. If null, a new node is created.",
+        default=None, description="If provided → update existing node"
     )
-    title: str = Field(..., min_length=3, description="Clear and descriptive title")
-    summary: str = Field(
-        ..., min_length=10, description="High-quality 1-3 sentence summary"
-    )
-    node_type_name: str = Field(..., description="Exact name of an existing NodeType")
+    title: str = Field(..., min_length=3)
+    summary: str = Field(..., min_length=10)
+    node_type_name: str
     content: str = Field(default="", description="Full content in Markdown")
-    tag_names: list[str] = Field(default_factory=list, description="List of tag names")
+    tag_names: list[str] = Field(default_factory=list)
 
 
 class RelationshipInput(BaseModel):
@@ -45,7 +47,7 @@ class RelationshipInput(BaseModel):
 
 
 # =============================================================================
-# Per-Step Result Models (Structured Output)
+# Per-Step Result Models
 # =============================================================================
 
 
@@ -91,16 +93,26 @@ class WizardState:
 
 
 # =============================================================================
-# Smart Wrappers
+# Core Action Wrappers (async-safe)
 # =============================================================================
 
 
-async def create_or_update_node(node: NodeInput) -> dict:
-    """Creates a new node or updates an existing one based on the presence of `id`."""
-    if node.id:
-        from knowkey.mcp.tools.nodes import update_node
+@sync_to_async()
+def w_search_nodes(query: str, limit: int = 10):
+    nodes = search_nodes(query=query, limit=limit)
+    return {"results": [n.__dict__ for n in nodes]}  # simplified for wizard
 
-        return update_node(
+
+@sync_to_async()
+def w_create_node_type(name: str, description: str = "", icon: str = ""):
+    nt = create_node_type(name=name, description=description, icon=icon)
+    return {"success": True, "id": str(nt.id), "name": nt.name}
+
+
+@sync_to_async()
+def w_create_or_update_node(node: NodeInput):
+    if node.id:
+        result = update_node(
             node_id=node.id,
             title=node.title,
             summary=node.summary,
@@ -109,27 +121,30 @@ async def create_or_update_node(node: NodeInput) -> dict:
             tag_names=node.tag_names,
         )
     else:
-        from knowkey.mcp.tools.nodes import create_node
-
-        return create_node(
+        result = create_node(
             title=node.title,
             summary=node.summary,
             node_type_name=node.node_type_name,
             content=node.content,
             tag_names=node.tag_names,
         )
+    return {
+        "success": True,
+        "id": str(result.id),
+        "title": result.title,
+        "version_number": result.version_number,
+    }
 
 
-async def w_search_nodes(query: str, limit: int = 10) -> dict:
-    from knowkey.mcp.tools.search import search_nodes
-
-    return {"results": search_nodes(query=query, limit=limit)}
-
-
-async def w_create_node_type(name: str, description: str = "", icon: str = "") -> dict:
-    from knowkey.mcp.tools.nodes import create_node_type
-
-    return create_node_type(name=name, description=description, icon=icon)
+@sync_to_async()
+def w_create_relationship(rel: RelationshipInput):
+    create_relationship(
+        source_id=rel.source_id,
+        target_id=rel.target_id,
+        relationship_type=rel.relationship_type,
+        weight=rel.weight,
+    )
+    return {"success": True}
 
 
 # =============================================================================
@@ -139,75 +154,53 @@ async def w_create_node_type(name: str, description: str = "", icon: str = "") -
 
 def get_wizard_steps() -> list[dict]:
     return [
-        # Step 1: Main Node
         {
             "id": "create_main_node",
-            "description": "Create or update the main/primary node",
-            "instructions": (
-                "Goal: {goal}\n\n"
-                "1. Use search_nodes to check if similar knowledge already exists.\n"
-                "2. Create or update the main node using create_or_update_node.\n"
-                "3. If the NodeType doesn't exist, create it first with create_node_type."
-            ),
+            "description": "Create or update the main node",
+            "instructions": "Goal: {goal}\n\nSearch first, then create/update the main node.",
             "tools": [
                 SamplingTool.from_function(w_search_nodes, name="search_nodes"),
                 SamplingTool.from_function(w_create_node_type, name="create_node_type"),
                 SamplingTool.from_function(
-                    create_or_update_node, name="create_or_update_node"
+                    w_create_or_update_node, name="create_or_update_node"
                 ),
             ],
             "result_type": CreateMainNodeResult,
-            "available_actions": ["create_node", "cancel"],
             "can_skip": False,
             "can_previous": False,
         },
-        # Step 2: Related Nodes (batch)
         {
             "id": "create_related_nodes",
-            "description": "Create or update related/correlated nodes (supports batch)",
-            "instructions": (
-                "Create or update supporting nodes that relate to the main node.\n"
-                "You can provide multiple nodes at once."
-            ),
+            "description": "Create related nodes (batch supported)",
+            "instructions": "Create supporting nodes related to the main topic.",
             "tools": [
                 SamplingTool.from_function(w_search_nodes, name="search_nodes"),
                 SamplingTool.from_function(w_create_node_type, name="create_node_type"),
                 SamplingTool.from_function(
-                    create_or_update_node, name="create_or_update_node"
+                    w_create_or_update_node, name="create_or_update_node"
                 ),
             ],
             "result_type": CreateRelatedNodesResult,
-            "available_actions": ["create_nodes", "skip", "previous", "cancel"],
             "can_skip": True,
             "can_previous": True,
         },
-        # Step 3: Relationships
         {
             "id": "create_relationships",
-            "description": "Create relationships between the nodes",
-            "instructions": (
-                "Create meaningful relationships between the main node and related nodes.\n"
-                "Use search_nodes if you need to find node IDs."
-            ),
+            "description": "Create relationships",
+            "instructions": "Define meaningful relationships between nodes.",
             "tools": [
                 SamplingTool.from_function(w_search_nodes, name="search_nodes"),
             ],
             "result_type": CreateRelationshipsResult,
-            "available_actions": ["create_relationships", "skip", "previous", "cancel"],
             "can_skip": True,
             "can_previous": True,
         },
-        # Step 4: Review & Commit
         {
             "id": "review_and_commit",
-            "description": "Review everything and confirm to persist",
-            "instructions": (
-                "Review the main node, related nodes, and relationships.\n"
-                "Confirm only when everything looks correct."
-            ),
+            "description": "Review and confirm",
+            "instructions": "Review all created content and confirm to persist.",
             "tools": [],
             "result_type": ReviewResult,
-            "available_actions": ["confirm", "previous", "cancel"],
             "can_skip": False,
             "can_previous": True,
         },
@@ -221,40 +214,14 @@ def get_wizard_steps() -> list[dict]:
 
 @mcp.tool
 async def knowledge_wizard(
-    goal: str = Field(
-        ...,
-        description="High-level goal of this knowledge capture (e.g. 'Capture the key decisions and rationale from our discussion about authentication')",
-    ),
-    conversation_transcript: str = Field(
-        default="",
-        description="Optional full conversation transcript to extract knowledge from",
-    ),
+    goal: str = Field(..., description="High-level goal of this knowledge capture"),
+    conversation_transcript: str = Field(default="", description="Optional transcript"),
     ctx: Context | None = None,
 ) -> dict:
-    """
-    Interactive Knowledge Wizard for Knowkey.
-
-    This is a **sequential, guided compose tool** that helps you build high-quality,
-    well-connected knowledge in Knowkey step by step.
-
-    It is designed for cases where you want to:
-    - Extract knowledge from a conversation
-    - Create or improve nodes with proper structure
-    - Avoid duplication by searching first
-    - Create meaningful relationships
-
-    The wizard runs through 4 main phases:
-    1. Create/Update the main node
-    2. Create/Update related nodes (batch supported)
-    3. Create relationships
-    4. Final review and confirmation
-
-    Use this tool when you want a structured, high-quality knowledge ingestion process
-    instead of calling individual tools manually.
-    """
+    """Interactive sequential Knowledge Wizard."""
 
     if ctx:
-        await ctx.info(f"[Wizard] Starting knowledge_wizard | Goal: {goal}")
+        await ctx.info(f"[Wizard] Starting | Goal: {goal}")
 
     state = WizardState(goal=goal, transcript=conversation_transcript)
     steps = get_wizard_steps()
@@ -263,91 +230,55 @@ async def knowledge_wizard(
         step = steps[state.current_step_index]
         step_id = step["id"]
 
-        if ctx:
-            await ctx.info(
-                f"[Wizard] → Entering step: {step_id} ({step['description']})"
-            )
+        if not ctx:
+            raise ToolError("No context provided")
 
-        prompt = step["instructions"].format(goal=state.goal)
-        result_type = step["result_type"]
+        await ctx.info(f"[Wizard] → Step: {step_id}")
 
-        # Call sampling with structured output for this specific step
         result = await ctx.sample(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are inside a sequential knowledge wizard. Follow the current step and return structured output.",
+                    "content": "You are inside the Knowledge Wizard. Follow the current step strictly.",
                 },
-                {"role": "user", "content": prompt},
+                {
+                    "role": "user",
+                    "content": str(step["instructions"].format(goal=state.goal)),
+                },
             ],
             tools=step.get("tools", []),
-            result_type=result_type,
+            result_type=step["result_type"],
             temperature=0.2,
         )
 
-        if ctx:
-            await ctx.info(
-                f"[Wizard]   Received action: {result.action} in step {step_id}"
-            )
-
-        # ====================== Navigation ======================
         if result.action == "cancel":
-            if ctx:
-                await ctx.info("[Wizard] Wizard cancelled by agent.")
-            return {"success": False, "message": "Wizard cancelled by agent."}
+            return {"success": False, "message": "Wizard cancelled."}
 
         if result.action == "previous" and step.get("can_previous"):
-            if ctx:
-                await ctx.info("[Wizard] Going back to previous step.")
             state.current_step_index = max(0, state.current_step_index - 1)
             continue
 
         if result.action == "skip" and step.get("can_skip"):
-            if ctx:
-                await ctx.info("[Wizard] Skipping current step.")
             state.current_step_index += 1
             continue
 
-        # ====================== Store results ======================
-        if step_id == "create_main_node" and isinstance(result, CreateMainNodeResult):
+        # Store results
+        if step_id == "create_main_node" and result.data:
             state.main_node = result.data
-            if ctx:
-                await ctx.info(
-                    f"[Wizard] Main node captured: {result.data.title if result.data else 'None'}"
-                )
+        elif step_id == "create_related_nodes" and result.data:
+            state.related_nodes.extend(result.data)
+        elif step_id == "create_relationships" and result.data:
+            state.relationships.extend(result.data)
 
-        elif step_id == "create_related_nodes" and isinstance(
-            result, CreateRelatedNodesResult
-        ):
-            if result.data:
-                state.related_nodes.extend(result.data)
-            if ctx:
-                await ctx.info(
-                    f"[Wizard] Related nodes added: {len(result.data or [])}"
-                )
-
-        elif step_id == "create_relationships" and isinstance(
-            result, CreateRelationshipsResult
-        ):
-            if result.data:
-                state.relationships.extend(result.data)
-            if ctx:
-                await ctx.info(
-                    f"[Wizard] Relationships proposed: {len(result.data or [])}"
-                )
-
-        # Move to next step
         state.current_step_index += 1
 
     if ctx:
-        await ctx.info("[Wizard] Wizard completed all steps.")
+        await ctx.info("[Wizard] Completed all steps.")
 
     return {
         "success": True,
-        "message": "Knowledge wizard finished successfully.",
         "goal": state.goal,
         "main_node": state.main_node.model_dump() if state.main_node else None,
         "related_nodes_count": len(state.related_nodes),
         "relationships_count": len(state.relationships),
-        "steps_completed": state.current_step_index,
     }
