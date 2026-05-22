@@ -1,100 +1,13 @@
-"""
-Tests for the Knowkey MCP Server.
-
-Combines Django model tests + FastMCP Client tests.
-"""
-
 import asyncio
-from typing import Any
 
-import pytest
-from django.test import TestCase
 from fastmcp import Client
-from knowkey.core.models import (
-    Author,
-    AuthorType,
-    Node,
-    NodeType,
-    RelationshipType,
-    Tag,
-)
+
+from knowkey.core.models import Node, NodeType
 from knowkey.mcp.server import mcp
-from knowkey.mcp.utils import async_to_sync
+
+from .base import MCPTestCase
 
 
-# =============================================================================
-# Test Base Class
-# =============================================================================
-class MCPTestCase(TestCase):
-    """Base class with common setup and MCP helpers."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = Author.objects.create(
-            name="Test User", author_type=AuthorType.USER
-        )
-        cls.note_type = NodeType.objects.create(name="Note", description="General note")
-        cls.decision_type = NodeType.objects.create(
-            name="Decision", description="Decision record"
-        )
-        cls.discusses_type = RelationshipType.objects.create(name="discusses")
-
-    def setUp(self):
-        self.live_node = Node.objects.create(
-            title="Original Note",
-            summary="This is the original summary",
-            content="Original detailed content",
-            node_type=self.note_type,
-            author=self.author,
-        )
-
-    @async_to_sync()
-    async def call_mcp_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
-        """Call an MCP tool with flat arguments."""
-        async with Client(mcp) as client:
-            await client.ping()
-            result = await client.call_tool(tool_name, arguments)
-            # FastMCP returns different structures depending on version
-            return result.data if hasattr(result, "data") else result
-
-    @async_to_sync()
-    async def get_mcp_resource(self, resource_name: str) -> list[dict]:
-        """Read an MCP resource."""
-        async with Client(mcp) as client:
-            await client.ping()
-            results = await client.read_resource(resource_name)
-            return [r.model_dump() for r in results]
-
-
-# =============================================================================
-# Model / Core Logic Tests
-# =============================================================================
-class KnowkeyMCPModelTests(MCPTestCase):
-
-    def test_create_knowkey_node_helper(self):
-        from knowkey.mcp.core import create_node
-
-        node = create_node(
-            title="MCP Created Node",
-            summary="Created through core helper",
-            content="Full content here",
-            node_type_name="Note",
-            tag_names=["test", "mcp"],
-            author_name="Grok",
-        )
-
-        self.assertTrue(node.is_latest)
-        self.assertEqual(node.metadata.get("source"), "mcp")
-        self.assertEqual(node.tags.count(), 2)
-        self.assertEqual(node.version_number, 1)
-
-    def test_revert_functionality_exists(self):
-        self.assertTrue(hasattr(self.live_node, "revert_to"))
-
-
-# =============================================================================
-# Tool Tests
-# =============================================================================
 class MCPToolsTests(MCPTestCase):
 
     def test_search_nodes_tool_exists(self):
@@ -212,29 +125,6 @@ class MCPToolsTests(MCPTestCase):
         self.assertEqual(self.live_node.title, "Original Note")
         self.assertEqual(self.live_node.version_number, 3)  # bad + revert
 
-
-# =============================================================================
-# Resource Tests
-# =============================================================================
-class MCPResourcesTests(MCPTestCase):
-
-    def test_ontology_resources(self):
-        node_types = self.get_mcp_resource("knowkey://ontology/node_types")
-        rel_types = self.get_mcp_resource("knowkey://ontology/relationship_types")
-
-        self.assertGreater(len(node_types), 0)
-        self.assertIn("Note", str(node_types))
-        self.assertIn("discusses", str(rel_types))
-
-    def test_node_resource(self):
-        data = self.get_mcp_resource(f"knowkey://node/{self.live_node.id}")
-        self.assertGreater(len(data), 0)
-        self.assertIn("Original", str(data))
-
-
-# ====================== NODE TYPE TOOL TESTS ======================
-class MCPNodeTypeTests(MCPTestCase):
-
     def test_create_node_type_tool(self):
         result = self.call_mcp_tool(
             "create_node_type",
@@ -283,7 +173,3 @@ class MCPNodeTypeTests(MCPTestCase):
 
         ontology = self.get_mcp_resource("knowkey://ontology/node_types")
         self.assertIn("Experiment", str(ontology))
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
