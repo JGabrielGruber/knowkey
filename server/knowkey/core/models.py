@@ -14,19 +14,6 @@ class AuthorType(models.TextChoices):
     SERVICE = "service", "External Service"
 
 
-class RelationshipType(models.TextChoices):
-    """Common relationship types"""
-
-    DISCUSSES = "discusses", "Discusses"
-    ANSWER_TO = "answer_to", "Answers to"
-    INSPIRED_BY = "inspired_by", "Inspired by"
-    PART_OF = "part_of", "Part of"
-    CONTRADICTS = "contradicts", "Contradicts"
-    HAS_ISSUE = "has_issue", "Has issue"
-    TAGGED_AS = "tagged_as", "Tagged as"
-    VERSION_OF = "version_of", "Is version of"
-
-
 # ==================== MANAGERS =======================
 class NodeManager(models.Manager):
     def latest_versions(self):

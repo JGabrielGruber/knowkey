@@ -47,6 +47,18 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Django Tests",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}server//manage.py",
+      "args": [
+        "test"
+      ],
+      "django": true,
+      "justMyCode": true,
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Run Tests (pytest)",
       "type": "python",
       "request": "launch",

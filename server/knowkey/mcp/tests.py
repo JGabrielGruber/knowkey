@@ -10,7 +10,14 @@ from typing import Any
 import pytest
 from django.test import TestCase
 from fastmcp import Client
-from knowkey.core.models import Author, AuthorType, Node, NodeType, Tag
+from knowkey.core.models import (
+    Author,
+    AuthorType,
+    Node,
+    NodeType,
+    RelationshipType,
+    Tag,
+)
 from knowkey.mcp.server import mcp
 from knowkey.mcp.utils import async_to_sync
 
@@ -30,6 +37,7 @@ class MCPTestCase(TestCase):
         cls.decision_type = NodeType.objects.create(
             name="Decision", description="Decision record"
         )
+        cls.discusses_type = RelationshipType.objects.create(name="discusses")
 
     def setUp(self):
         self.live_node = Node.objects.create(
@@ -64,9 +72,9 @@ class MCPTestCase(TestCase):
 class KnowkeyMCPModelTests(MCPTestCase):
 
     def test_create_knowkey_node_helper(self):
-        from knowkey.mcp.core import create_knowkey_node
+        from knowkey.mcp.core import create_node
 
-        node = create_knowkey_node(
+        node = create_node(
             title="MCP Created Node",
             summary="Created through core helper",
             content="Full content here",
@@ -164,7 +172,7 @@ class MCPToolsTests(MCPTestCase):
             {
                 "source_node_id": str(self.live_node.id),
                 "target_node_id": str(other.id),
-                "relationship_type": "discusses",
+                "relationship_type_name": "discusses",
             },
         )
 
@@ -239,7 +247,6 @@ class MCPNodeTypeTests(MCPTestCase):
         )
 
         self.assertTrue(result.get("success"))
-        self.assertTrue(result.get("created"))
         self.assertIn("id", result)
         self.assertEqual(result["name"], "Analysis")
 

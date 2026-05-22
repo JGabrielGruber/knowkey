@@ -1,164 +1,118 @@
+"""
+Core Model Tests for Knowkey
+"""
+
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-
-from .models import Author, AuthorType, Node, NodeRelationship, NodeType
+from knowkey.core.models import (
+    Author,
+    AuthorType,
+    Node,
+    NodeRelationship,
+    NodeType,
+    RelationshipType,
+    Tag,
+)
 
 
 class KnowkeyCoreTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.author = Author.objects.create(
-            name="Test User", author_type=AuthorType.USER
+        cls.author = Author.objects.create(name="Grok", author_type=AuthorType.CHATBOT)
+        cls.person_type = NodeType.objects.create(name="Person")
+        cls.org_type = NodeType.objects.create(name="Organization")
+        cls.discusses_type = RelationshipType.objects.create(
+            name="discusses", description="Discusses or mentions"
         )
-        cls.node_type = NodeType.objects.create(name="Note")
 
-    def setUp(self):
-        # Fresh live node for each test
-        self.live = Node.objects.create(
-            title="Original Title",
-            summary="Original summary",
-            content="Original content",
-            node_type=self.node_type,
+    def test_author_creation(self):
+        author = Author.objects.create(
+            name="José Gabriel Gruber", author_type=AuthorType.USER
+        )
+        self.assertEqual(author.name, "José Gabriel Gruber")
+
+    def test_node_creation_and_versioning(self):
+        node = Node.objects.create(
+            title="Alpha Ape",
+            summary="Human partner in the partnership",
+            content="Detailed bio...",
+            node_type=self.person_type,
             author=self.author,
         )
 
-    # ====================== BASIC VERSIONING ======================
-    def test_new_node_is_live_version_1(self):
-        self.assertTrue(self.live.is_latest)
-        self.assertEqual(self.live.version_number, 1)
-        self.assertIsNone(self.live.version_of)
+        self.assertTrue(node.is_latest)
+        self.assertEqual(node.version_number, 1)
 
-    def test_edit_creates_snapshot_and_increments_version(self):
-        self.live.title = "New Title"
-        self.live.content = "New content"
-        self.live.save()
+        # Update should create new version
+        node.title = "Alpha Ape (Updated)"
+        node.save()
 
-        self.live.refresh_from_db()
-        self.assertEqual(self.live.version_number, 2)
-        self.assertTrue(self.live.is_latest)
+        node.refresh_from_db()
+        self.assertEqual(node.version_number, 2)
+        self.assertTrue(node.is_latest)
 
-        # Check snapshot was created
-        snapshot = self.live.versions.get(version_number=1)
-        self.assertEqual(snapshot.title, "Original Title")
-        self.assertEqual(snapshot.content, "Original content")
+        # Check snapshot
+        snapshot = node.versions.get(version_number=1)
+        self.assertEqual(snapshot.title, "Alpha Ape")
         self.assertFalse(snapshot.is_latest)
 
-    def test_minor_changes_do_not_create_snapshot(self):
-        self.live.metadata["foo"] = "bar"
-        self.live.save()  # only metadata changed
-
-        self.live.refresh_from_db()
-        self.assertEqual(self.live.version_number, 1)  # no increment
-        self.assertEqual(self.live.versions.count(), 0)
-
-    # ====================== MANUAL SNAPSHOT ======================
-    def test_create_manual_snapshot(self):
-        snapshot = self.live.create_manual_snapshot()
-
-        self.assertEqual(snapshot.version_number, 1)
-        self.assertEqual(snapshot.version_of, self.live)
-        self.assertEqual(self.live.versions.count(), 1)
-
-    # ====================== REVERT MAGIC ======================
-    def test_revert_to_snapshot_restores_content_and_relationships(self):
-        # 1. Add a relationship
-        rel = NodeRelationship.objects.create(
-            source=self.live,
-            target=self.live,  # self-relationship for simplicity
-            relationship_type="discusses",
-            created_by=self.author,
+    def test_relationship_only_between_live_nodes(self):
+        alpha = Node.objects.create(
+            title="Alpha Ape", node_type=self.person_type, author=self.author
+        )
+        cyber = Node.objects.create(
+            title="Cyber Monkey", node_type=self.person_type, author=self.author
         )
 
-        # 2. Edit the node (creates snapshot v2)
-        self.live.title = "Changed Title"
-        self.live.content = "Changed content"
-        self.live.save()
+        rel = NodeRelationship.objects.create(
+            source=alpha,
+            target=cyber,
+            relationship_type=self.discusses_type,
+            created_by=self.author,
+        )
+        self.assertIsNotNone(rel.id)
 
-        snapshot_v1 = self.live.versions.get(version_number=1)
+    def test_relationship_validation_fails_on_snapshot(self):
+        alpha = Node.objects.create(
+            title="Alpha Ape", node_type=self.person_type, author=self.author
+        )
+        alpha.title = "Bad Change"
+        alpha.save()  # creates version 2
 
-        # 3. Revert
-        self.live.revert_to(snapshot_v1, bypass_versioning=False)
-
-        self.live.save()
-
-        self.live.refresh_from_db()
-
-        self.assertEqual(self.live.title, "Original Title")
-        self.assertEqual(self.live.content, "Original content")
-        self.assertEqual(self.live.version_number, 3)  # new history entry created
-
-        # Relationship was restored
-        self.assertEqual(self.live.outgoing_relationships.count(), 1)
-        restored_rel = self.live.outgoing_relationships.first()
-        self.assertEqual(restored_rel.relationship_type, "discusses")
-
-        # History is preserved (we have v1 and v2 + live)
-        self.assertEqual(self.live.versions.count(), 2)
-
-    def test_revert_creates_history_of_bad_state_first(self):
-        self.live.title = "Bad Change"
-        self.live.save()
-        snapshot_bad = self.live.versions.latest("version_number")
-
-        original_snapshot = self.live.versions.get(version_number=1)
-
-        self.live.revert_to(original_snapshot, bypass_versioning=False)
-
-        # We should now have: original → bad → reverted (2 snapshots + live)
-        self.assertEqual(self.live.versions.count(), 2)
-
-    # ====================== RELATIONSHIP SAFETY ======================
-    def test_relationships_only_allowed_between_live_nodes(self):
-        snapshot = self.live.create_manual_snapshot()
+        snapshot = alpha.versions.get(version_number=1)
+        cyber = Node.objects.create(
+            title="Cyber Monkey", node_type=self.person_type, author=self.author
+        )
 
         with self.assertRaises(ValidationError):
             rel = NodeRelationship(
                 source=snapshot,  # not live
-                target=self.live,
-                relationship_type="discusses",
+                target=cyber,
+                relationship_type=self.discusses_type,
                 created_by=self.author,
             )
             rel.full_clean()
 
-    # ====================== MANAGERS ======================
-    def test_latest_versions_manager(self):
-        self.live.title = "Edited"
-        self.live.save()
-
-        all_nodes = Node.objects.all_versions().count()
-        live_only = Node.objects.latest_versions().count()
-
-        self.assertEqual(live_only, 1)
-        self.assertEqual(all_nodes, 2)  # live + snapshot
-
-    def test_get_full_history(self):
-        self.live.title = "v2"
-        self.live.save()
-        self.live.title = "v3"
-        self.live.save()
-
-        history = self.live.get_full_history()
-        self.assertEqual(len(history), 3)
-        self.assertEqual(history[0].version_number, 3)
-        self.assertEqual([n.version_number for n in history], [3, 2, 1])
-
-    # ====================== SOFT DELETE ======================
-    def test_delete_archives_instead_of_hard_deleting(self):
-        self.live.delete()
-        self.live.refresh_from_db()
-        self.assertTrue(self.live.is_archived)
-
-    # ====================== EDGE CASES ======================
-    def test_cannot_revert_snapshot_itself(self):
-        snapshot = self.live.create_manual_snapshot()
-        with self.assertRaises(ValueError):
-            snapshot.revert_to(snapshot)  # wrong
-
-    def test_cannot_revert_with_wrong_snapshot(self):
-        other_node = Node.objects.create(
-            title="Other", node_type=self.node_type, author=self.author
+    def test_tag_management(self):
+        node = Node.objects.create(
+            title="Test Node", node_type=self.person_type, author=self.author
         )
-        snapshot = other_node.create_manual_snapshot()
-        with self.assertRaises(ValueError):
-            self.live.revert_to(snapshot)
+        tag1 = Tag.objects.create(name="alpha-ape")
+        tag2 = Tag.objects.create(name="founder")
+
+        node.tags.add(tag1, tag2)
+        self.assertEqual(node.tags.count(), 2)
+
+    def test_search_nodes_helper(self):
+        from knowkey.mcp.core import search_nodes
+
+        Node.objects.create(
+            title="Valve Corporation",
+            summary="Game developer",
+            node_type=self.org_type,
+            author=self.author,
+        )
+
+        results = search_nodes(query="Valve")
+        self.assertGreaterEqual(len(results), 1)

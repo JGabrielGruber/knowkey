@@ -25,6 +25,12 @@ class NodeTypeSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description", "icon", "color"]
 
 
+class RelationshipTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RelationshipType
+        fields = ["id", "name", "description", "icon", "color"]
+
+
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
@@ -32,8 +38,6 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class NodeSerializer(serializers.ModelSerializer):
-    """Full serializer used for detail, create, update, and revert responses"""
-
     node_type = NodeTypeSerializer(read_only=True)
     node_type_id = serializers.UUIDField(write_only=True, required=True)
 
@@ -78,46 +82,8 @@ class NodeSerializer(serializers.ModelSerializer):
             "is_latest",
         ]
 
-    def create(self, validated_data):
-        tags_ids = validated_data.pop("tags_ids", [])
-        node_type_id = validated_data.pop("node_type_id")
-        author_id = validated_data.pop("author_id")
-
-        node = Node.objects.create(
-            node_type_id=node_type_id,
-            author_id=author_id,
-            **validated_data,
-        )
-
-        if tags_ids:
-            node.tags.set(tags_ids)
-
-        return node
-
-    def update(self, instance, validated_data):
-        tags_ids = validated_data.pop("tags_ids", None)
-        node_type_id = validated_data.pop("node_type_id", None)
-        author_id = validated_data.pop("author_id", None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        if node_type_id is not None:
-            instance.node_type_id = node_type_id
-        if author_id is not None:
-            instance.author_id = author_id
-
-        instance.save()
-
-        if tags_ids is not None:
-            instance.tags.set(tags_ids)
-
-        return instance
-
 
 class NodeListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for list views (fast)"""
-
     node_type = NodeTypeSerializer(read_only=True)
     author = AuthorSerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
@@ -141,33 +107,43 @@ class NodeListSerializer(serializers.ModelSerializer):
 
 
 class NodeRelationshipSerializer(serializers.ModelSerializer):
-    relationship_type_display = serializers.CharField(
-        source="get_relationship_type_display", read_only=True
-    )
+    relationship_type = RelationshipTypeSerializer(read_only=True)
+    relationship_type_id = serializers.UUIDField(write_only=True, required=True)
+    source_id = serializers.UUIDField(
+        write_only=True, required=True
+    )  # renamed for clarity
+    target_id = serializers.UUIDField(write_only=True, required=True)
+    created_by_id = serializers.UUIDField(write_only=True, required=True)
 
     class Meta:
         model = NodeRelationship
         fields = [
             "id",
-            "source",
-            "target",
+            "source_id",  # Changed from 'source'
+            "target_id",  # Changed from 'target'
             "relationship_type",
-            "relationship_type_display",
+            "relationship_type_id",
             "weight",
-            "created_by",
+            "created_by_id",  # Changed from 'created_by'
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "relationship_type"]
 
-    def validate(self, data):
-        """Enforce the model's rule: relationships only between live nodes."""
-        # Build a temporary instance so we can run model validation
-        instance = NodeRelationship(
-            source=data.get("source"),
-            target=data.get("target"),
-            relationship_type=data.get("relationship_type"),
-            weight=data.get("weight", 1.0),
-            created_by=data.get("created_by"),
+    def create(self, validated_data):
+        relationship_type_id = validated_data.pop("relationship_type_id")
+        source_id = validated_data.pop("source_id")
+        target_id = validated_data.pop("target_id")
+        created_by_id = validated_data.pop("created_by_id")
+
+        relationship_type = RelationshipType.objects.get(id=relationship_type_id)
+        source = Node.objects.get(id=source_id)
+        target = Node.objects.get(id=target_id)
+        created_by = Author.objects.get(id=created_by_id)
+
+        return NodeRelationship.objects.create(
+            source=source,
+            target=target,
+            relationship_type=relationship_type,
+            created_by=created_by,
+            **validated_data,
         )
-        instance.full_clean()  # This calls NodeRelationship.clean()
-        return data

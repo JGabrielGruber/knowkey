@@ -6,6 +6,7 @@ from .views import (
     NodeRelationshipViewSet,
     NodeTypeViewSet,
     NodeViewSet,
+    RelationshipTypeViewSet,
     TagViewSet,
 )
 
@@ -14,6 +15,7 @@ router.register(r"authors", AuthorViewSet)
 router.register(r"nodetypes", NodeTypeViewSet)
 router.register(r"tags", TagViewSet)
 router.register(r"nodes", NodeViewSet)
+router.register(r"relationshiptypes", RelationshipTypeViewSet)
 router.register(r"relationships", NodeRelationshipViewSet)
 
 urlpatterns = [

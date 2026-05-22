@@ -1,5 +1,12 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from knowkey.core.models import Author, Node, NodeRelationship, NodeType, Tag
+from knowkey.core.models import (
+    Author,
+    Node,
+    NodeRelationship,
+    NodeType,
+    RelationshipType,
+    Tag,
+)
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,6 +17,7 @@ from .serializers import (
     NodeRelationshipSerializer,
     NodeSerializer,
     NodeTypeSerializer,
+    RelationshipTypeSerializer,
     TagSerializer,
 )
 
@@ -102,8 +110,15 @@ class NodeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+class RelationshipTypeViewSet(viewsets.ModelViewSet):
+    queryset = RelationshipType.objects.all()
+    serializer_class = RelationshipTypeSerializer
+
+
 class NodeRelationshipViewSet(viewsets.ModelViewSet):
     queryset = NodeRelationship.objects.all().select_related(
-        "source", "target", "created_by"
+        "source", "target", "relationship_type", "created_by"
     )
     serializer_class = NodeRelationshipSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["relationship_type__name", "source__id", "target__id"]
