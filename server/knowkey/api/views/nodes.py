@@ -1,40 +1,14 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from knowkey.core.models import (
-    Author,
-    Node,
-    NodeRelationship,
-    NodeType,
-    RelationshipType,
-    Tag,
-)
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .serializers import (
-    AuthorSerializer,
+from knowkey.api.serializers import (
     NodeListSerializer,
     NodeRelationshipSerializer,
     NodeSerializer,
-    NodeTypeSerializer,
-    RelationshipTypeSerializer,
-    TagSerializer,
 )
-
-
-class AuthorViewSet(viewsets.ModelViewSet):
-    queryset = Author.objects.all()
-    serializer_class = AuthorSerializer
-
-
-class NodeTypeViewSet(viewsets.ModelViewSet):
-    queryset = NodeType.objects.all()
-    serializer_class = NodeTypeSerializer
-
-
-class TagViewSet(viewsets.ModelViewSet):
-    queryset = Tag.objects.all()
-    serializer_class = TagSerializer
+from knowkey.core.models import Node, NodeRelationship
 
 
 class NodeViewSet(viewsets.ModelViewSet):
@@ -108,11 +82,6 @@ class NodeViewSet(viewsets.ModelViewSet):
             history, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data)
-
-
-class RelationshipTypeViewSet(viewsets.ModelViewSet):
-    queryset = RelationshipType.objects.all()
-    serializer_class = RelationshipTypeSerializer
 
 
 class NodeRelationshipViewSet(viewsets.ModelViewSet):

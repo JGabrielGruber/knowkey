@@ -1,3 +1,5 @@
+from rest_framework import serializers
+
 from knowkey.core.models import (
     Author,
     Node,
@@ -6,35 +8,9 @@ from knowkey.core.models import (
     RelationshipType,
     Tag,
 )
-from rest_framework import serializers
 
-
-class AuthorSerializer(serializers.ModelSerializer):
-    author_type_display = serializers.CharField(
-        source="get_author_type_display", read_only=True
-    )
-
-    class Meta:
-        model = Author
-        fields = ["id", "name", "author_type", "author_type_display", "created_at"]
-
-
-class NodeTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = NodeType
-        fields = ["id", "name", "description", "icon", "color"]
-
-
-class RelationshipTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RelationshipType
-        fields = ["id", "name", "description", "icon", "color"]
-
-
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tag
-        fields = ["id", "name", "description", "color", "created_at"]
+from .authors import AuthorSerializer
+from .ontology import NodeTypeSerializer, RelationshipTypeSerializer, TagSerializer
 
 
 class NodeSerializer(serializers.ModelSerializer):

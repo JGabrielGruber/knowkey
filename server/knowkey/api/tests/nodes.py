@@ -1,8 +1,7 @@
-"""
-API Tests for Knowkey - REST Layer
-"""
-
 from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from knowkey.core.models import (
     Author,
     AuthorType,
@@ -10,10 +9,7 @@ from knowkey.core.models import (
     NodeRelationship,
     NodeType,
     RelationshipType,
-    Tag,
 )
-from rest_framework import status
-from rest_framework.test import APITestCase
 
 
 class NodeAPITests(APITestCase):
@@ -133,11 +129,3 @@ class NodeAPITests(APITestCase):
         self.assertIn(
             response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_201_CREATED]
         )
-
-
-class TagAndTypeAPITests(APITestCase):
-
-    def test_list_node_types(self):
-        url = reverse("nodetype-list")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
