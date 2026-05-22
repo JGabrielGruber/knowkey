@@ -55,11 +55,13 @@ def serialize_node(node: Node, include_relationships: bool = False) -> dict[str,
     if include_relationships:
         data["outgoing_relationships"] = [
             {
-                "relationship_type": rel.relationship_type,
+                "relationship_type": rel.relationship_type.name,
                 "target_id": str(rel.target.id),
                 "target_title": rel.target.title,
             }
-            for rel in node.outgoing_relationships.select_related("target").all()[:20]
+            for rel in node.outgoing_relationships.select_related(
+                "relationship_type", "target"
+            ).all()[:20]
         ]
         data["incoming_relationships"] = [
             {
@@ -67,7 +69,9 @@ def serialize_node(node: Node, include_relationships: bool = False) -> dict[str,
                 "source_id": str(rel.source.id),
                 "source_title": rel.source.title,
             }
-            for rel in node.incoming_relationships.select_related("source").all()[:20]
+            for rel in node.incoming_relationships.select_related(
+                "relationship_type", "source"
+            ).all()[:20]
         ]
     return data
 
