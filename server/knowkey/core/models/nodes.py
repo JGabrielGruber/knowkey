@@ -5,13 +5,8 @@ from django.db import models
 from django.utils import timezone
 from pgvector.django import VectorField
 
-
-# ====================== ENUMS ======================
-class AuthorType(models.TextChoices):
-    USER = "user", "User"
-    CHATBOT = "chatbot", "Chat Bot"
-    AGENT = "agent", "Cli Agent"
-    SERVICE = "service", "External Service"
+from .authors import Author
+from .ontology import NodeType, RelationshipType, Tag
 
 
 # ==================== MANAGERS =======================
@@ -30,65 +25,6 @@ class NodeManager(models.Manager):
 
 
 # ====================== MODELS ======================
-class Author(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255)
-    author_type = models.CharField(max_length=20, choices=AuthorType.choices)
-    created_at = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return f"{self.name} ({self.get_author_type_display()})"
-
-
-class NodeType(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-    icon = models.CharField(max_length=50, blank=True)
-    color = models.CharField(max_length=50, blank=True)
-
-    class Meta:
-        ordering = ["name"]
-        verbose_name = "Node Type"
-        verbose_name_plural = "Node Types"
-
-    def __str__(self):
-        return self.name
-
-
-class RelationshipType(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-    icon = models.CharField(max_length=50, blank=True)
-    color = models.CharField(max_length=50, blank=True)
-
-    class Meta:
-        ordering = ["name"]
-        verbose_name = "Relationship Type"
-        verbose_name_plural = "Relationship Types"
-
-    def __str__(self):
-        return self.name
-
-
-class Tag(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True)
-    color = models.CharField(max_length=50, blank=True)
-    created_at = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
-
 class Node(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 

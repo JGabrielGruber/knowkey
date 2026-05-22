@@ -1,9 +1,6 @@
-"""
-Core Model Tests for Knowkey
-"""
-
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+
 from knowkey.core.models import (
     Author,
     AuthorType,
@@ -11,11 +8,10 @@ from knowkey.core.models import (
     NodeRelationship,
     NodeType,
     RelationshipType,
-    Tag,
 )
 
 
-class KnowkeyCoreTests(TestCase):
+class NodeTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -25,12 +21,6 @@ class KnowkeyCoreTests(TestCase):
         cls.discusses_type = RelationshipType.objects.create(
             name="discusses", description="Discusses or mentions"
         )
-
-    def test_author_creation(self):
-        author = Author.objects.create(
-            name="José Gabriel Gruber", author_type=AuthorType.USER
-        )
-        self.assertEqual(author.name, "José Gabriel Gruber")
 
     def test_node_creation_and_versioning(self):
         node = Node.objects.create(
@@ -93,16 +83,6 @@ class KnowkeyCoreTests(TestCase):
                 created_by=self.author,
             )
             rel.full_clean()
-
-    def test_tag_management(self):
-        node = Node.objects.create(
-            title="Test Node", node_type=self.person_type, author=self.author
-        )
-        tag1 = Tag.objects.create(name="alpha-ape")
-        tag2 = Tag.objects.create(name="founder")
-
-        node.tags.add(tag1, tag2)
-        self.assertEqual(node.tags.count(), 2)
 
     def test_search_nodes_helper(self):
         from knowkey.mcp.core import search_nodes
