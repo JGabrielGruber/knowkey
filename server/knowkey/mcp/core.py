@@ -65,7 +65,7 @@ def serialize_node(node: Node, include_relationships: bool = False) -> dict[str,
         ]
         data["incoming_relationships"] = [
             {
-                "relationship_type": rel.relationship_type,
+                "relationship_type": rel.relationship_type.name,
                 "source_id": str(rel.source.id),
                 "source_title": rel.source.title,
             }
