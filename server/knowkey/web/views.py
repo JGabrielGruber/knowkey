@@ -98,7 +98,3 @@ def node_detail(request, pk):
         pk=pk,
     )
     return render(request, "web/nodes/detail.html", {"node": node})
-    context = {
-        "node": node,
-    }
-    return render(request, "web/nodes/detail.html", context)
