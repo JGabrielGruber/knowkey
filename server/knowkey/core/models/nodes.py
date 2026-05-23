@@ -13,7 +13,7 @@ from .ontology import NodeType, RelationshipType, Tag
 class NodeManager(models.Manager):
     def latest_versions(self):
         """Return only the current (latest) version of each node"""
-        return self.filter(version_of__isnull=True)
+        return self.filter(version_of__isnull=True, is_archived=False)
 
     def all_versions(self):
         """For history view"""
