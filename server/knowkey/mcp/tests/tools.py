@@ -1,7 +1,6 @@
 import asyncio
 
 from fastmcp import Client
-
 from knowkey.core.models import Node, NodeType
 from knowkey.mcp.server import mcp
 
@@ -173,3 +172,58 @@ class MCPToolsTests(MCPTestCase):
 
         ontology = self.get_mcp_resource("knowkey://ontology/node_types")
         self.assertIn("Experiment", str(ontology))
+
+    def test_get_node_tool(self):
+        """Test basic get_node functionality."""
+        result = self.call_mcp_tool(
+            "get_node",
+            {"node_id": str(self.live_node.id)},
+        )
+
+        self.assertIn("id", result)
+        self.assertIn("title", result)
+        self.assertIn("summary", result)
+        self.assertIn("node_type", result)
+        self.assertEqual(result["title"], "Original Note")
+        self.assertEqual(result["is_latest"], True)
+
+    def test_get_node_with_relationships(self):
+        """Test get_node includes relationships when they exist."""
+        # Create a related node and relationship
+        other = Node.objects.create(
+            title="Related Knowledge",
+            summary="This is related content",
+            node_type=self.note_type,
+            author=self.author,
+        )
+
+        # Create relationship
+        self.call_mcp_tool(
+            "create_relationship",
+            {
+                "source_node_id": str(self.live_node.id),
+                "target_node_id": str(other.id),
+                "relationship_type_name": "discusses",
+            },
+        )
+
+        # Get the node with relationships
+        result = self.call_mcp_tool(
+            "get_node",
+            {"node_id": str(self.live_node.id)},
+        )
+
+        self.assertIn("outgoing_relationships", result)
+        self.assertGreaterEqual(len(result["outgoing_relationships"]), 1)
+
+        rel = result["outgoing_relationships"][0]
+        self.assertEqual(rel["relationship_type"], "discusses")
+        self.assertEqual(rel["target_title"], "Related Knowledge")
+
+    def test_get_node_nonexistent_raises_error(self):
+        """Test that getting a non-existent node raises ToolError."""
+        with self.assertRaises(Exception):  # Should be ToolError
+            self.call_mcp_tool(
+                "get_node",
+                {"node_id": "00000000-0000-0000-0000-000000000000"},
+            )
