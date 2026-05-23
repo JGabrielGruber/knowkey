@@ -29,20 +29,30 @@ services:
     networks:
       - db
 
+  nginx:
+    image: nginx:alpine
+    container_name: knowkey-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8088:80"
+    depends_on:
+      - knowkey-server
+      - knowkey-mcp
+    networks:
+      - app
+      - db
+
   knowkey-migration:
     build:
       context: ./server/
       dockerfile: Dockerfile
-    container_name: knowkey-migration
     command: python manage.py migrate --noinput
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DJANGO_SETTINGS_MODULE: knowkey.settings
-      POSTGRES_DB: knowkey
-      POSTGRES_USER: knowkey
-      POSTGRES_PASSWORD: knowkey123
       POSTGRES_HOST: postgres
       REDIS_URL: redis://redis:6379/0
     volumes:
@@ -55,24 +65,17 @@ services:
     build:
       context: ./server/
       dockerfile: Dockerfile
-    container_name: knowkey-server
     command: python manage.py runserver 0.0.0.0:8000
     depends_on:
       - postgres
       - redis
       - knowkey-migration
     environment:
-      DJANGO_SETTINGS_MODULE: knowkey.settings
-      POSTGRES_DB: knowkey
-      POSTGRES_USER: knowkey
-      POSTGRES_PASSWORD: knowkey123
       POSTGRES_HOST: postgres
       REDIS_URL: redis://redis:6379/0
       DEBUG: "True"
     volumes:
       - ./server/:/app
-    ports:
-      - "8088:8000"
     networks:
       - app
       - db
@@ -81,24 +84,17 @@ services:
     build:
       context: ./server/
       dockerfile: Dockerfile
-    container_name: knowkey-mcp
     command: python manage.py run_mcp_server --host 0.0.0.0 --port 8001 --transport streamable-http
     depends_on:
       - postgres
       - redis
       - knowkey-migration
     environment:
-      DJANGO_SETTINGS_MODULE: knowkey.settings
-      POSTGRES_DB: knowkey
-      POSTGRES_USER: knowkey
-      POSTGRES_PASSWORD: knowkey123
       POSTGRES_HOST: postgres
       REDIS_URL: redis://redis:6379/0
       DEBUG: "True"
     volumes:
       - ./server/:/app
-    ports:
-      - "8089:8001"
     networks:
       - app
       - db
