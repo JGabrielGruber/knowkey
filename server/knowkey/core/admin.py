@@ -1,4 +1,5 @@
 from django.contrib import admin
+from knowkey.core.models.ontology import RelationshipType
 
 from .models import Author, Node, NodeRelationship, NodeType, Tag
 
@@ -159,6 +160,12 @@ class NodeAdmin(admin.ModelAdmin):
 
     is_latest.boolean = True
     is_latest.short_description = "Live Head"
+
+
+@admin.register(RelationshipType)
+class RelationshipTypeAdmin(admin.ModelAdmin):
+    list_display = ["name", "icon", "color"]
+    search_fields = ["name", "description"]
 
 
 @admin.register(NodeRelationship)
