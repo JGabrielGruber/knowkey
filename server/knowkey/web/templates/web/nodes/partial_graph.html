@@ -1,0 +1,77 @@
+<div id="graph-container" class="w-full border border-slate-800 rounded-3xl bg-zinc-900" style="height: 720px;"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cy = cytoscape({
+        container: document.getElementById('graph-container'),
+        elements: {{ graph_data|safe }},
+
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'background-color': '#6b21a8',
+                    'color': '#e0e7ff',
+                    'text-valign': 'center',
+                    'font-size': '12px',
+                    'width': 45,
+                    'height': 45,
+                    'text-wrap': 'wrap',
+                    'text-max-width': '80px'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 2,
+                    'line-color': '#64748b',
+                    'target-arrow-color': '#64748b',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'label': 'data(label)',
+                    'font-size': '10px',
+                    'text-rotation': 'autorotate',
+                    'text-margin-y': -8
+                }
+            },
+            {
+                selector: 'node[type="Person"]',
+                style: { 'background-color': '#ec4899' }
+            },
+            {
+                selector: 'node[type="Company"]',
+                style: { 'background-color': '#3b82f6' }
+            },
+            {
+                selector: 'node[type="Product"]',
+                style: { 'background-color': '#22c55e' }
+            }
+        ],
+
+        layout: {
+            name: 'cose',
+            animate: true,
+            animationDuration: 800,
+            idealEdgeLength: 80,
+            nodeRepulsion: 8000
+        }
+    });
+
+    // Click to go to detail
+    cy.on('tap', 'node', function(evt){
+        const nodeId = evt.target.id();
+        window.location.href = `/nodes/${nodeId}/`;
+    });
+
+    // Optional: Hover tooltip
+    cy.on('mouseover', 'node', function(evt){
+        const node = evt.target;
+        this.style('label', node.data('summary') || node.data('label'));
+    });
+
+    cy.on('mouseout', 'node', function(evt){
+        this.style('label', evt.target.data('label'));
+    });
+});
+</script>

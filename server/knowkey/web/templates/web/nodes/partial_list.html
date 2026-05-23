@@ -1,0 +1,43 @@
+<div class="space-y-3">
+    {% for node in nodes %}
+    <a href="{% url 'web:node-detail' node.pk %}" 
+       class="block hover:bg-base-300 border border-transparent hover:border-base-300 p-5 transition-all group">
+        
+        <div class="flex items-start justify-between gap-4">
+            <!-- Left: Title + Badge -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3">
+                    <h2 class="text-xl font-semibold group-hover:text-primary transition-colors truncate">
+                        {{ node.title }}
+                    </h2>
+                    <div class="badge badge-outline badge-sm whitespace-nowrap">
+                        {{ node.node_type.name }}
+                    </div>
+                </div>
+                
+                <p class="mt-2 line-clamp-2 text-base-content/70 text-[15px]">
+                    {{ node.summary }}
+                </p>
+            </div>
+
+            <!-- Right: Date -->
+            <div class="text-right text-xs text-base-content/50 whitespace-nowrap pt-1">
+                {{ node.updated_at|date:"M j" }}
+            </div>
+        </div>
+
+        <!-- Tags (compact) -->
+        {% if node.tags.all %}
+        <div class="flex flex-wrap gap-2 mt-4">
+            {% for tag in node.tags.all|slice:":5" %}
+            <div class="badge badge-neutral badge-sm">#{{ tag.name }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </a>
+    {% empty %}
+    <div class="text-center py-16">
+        <p class="text-base-content/60 text-lg">No results found.</p>
+    </div>
+    {% endfor %}
+</div>

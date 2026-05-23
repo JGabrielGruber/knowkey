@@ -1,0 +1,29 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+<div class="min-h-screen hero bg-base-200 items-center">
+    <div class="max-w-2xl mx-auto w-full text-center">
+        <h1 class="text-8xl font-bold tracking-tighter mb-6">Knowkey</h1>
+        <p class="text-2xl text-base-content/70 mb-12">
+            Your personal knowledge graph
+        </p>
+        <form action="/nodes" method="get" class="w-full">
+            <div class="join w-full shadow-2xl">
+                <input type="text" name="q" 
+                        placeholder="Search knowledge..." 
+                        class="input input-bordered input-lg join-item w-full text-lg focus:outline-none"
+                        autocomplete="off">
+                <button type="submit" class="btn btn-primary btn-lg join-item">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function searchExample(term) {
+    window.location.href = `/nodes/?q=${encodeURIComponent(term)}`;
+}
+</script>
+{% endblock %}
