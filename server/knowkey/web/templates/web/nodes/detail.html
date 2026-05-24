@@ -65,7 +65,7 @@
         <!-- Relationships -->
         {% if node.outgoing_relationships.all %}
         <div class="mt-14">
-            <h3 class="text-sm uppercase tracking-widest text-base-content/60 mb-6">Connected Knowledge</h3>
+            <h3 class="text-sm uppercase tracking-widest text-base-content/60 mb-6">Related to</h3>
             <div class="space-y-3">
                 {% for rel in node.outgoing_relationships.all %}
                 <a href="{% url 'web:node-detail' rel.target.pk %}" 
@@ -73,6 +73,26 @@
                     <div class="flex items-center gap-4">
                         <span class="text-lg group-hover:text-primary transition-colors">
                             {{ rel.target.title }}
+                        </span>
+                        <span class="badge badge-accent badge-outline badge-sm whitespace-nowrap">
+                            {{ rel.relationship_type.name }}
+                        </span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if incoming %}
+        <div class="mt-14">
+            <h3 class="text-sm uppercase tracking-widest text-base-content/60 mb-6">Related by</h3>
+            <div class="space-y-3">
+                {% for rel in incoming %}
+                <a href="{% url 'web:node-detail' rel.target.pk %}" 
+                   class="block p-6 hover:bg-base-300 border border-base-300 hover:border-primary group transition-all">
+                    <div class="flex items-center gap-4">
+                        <span class="text-lg group-hover:text-primary transition-colors">
+                            {{ rel.source.title }}
                         </span>
                         <span class="badge badge-accent badge-outline badge-sm whitespace-nowrap">
                             {{ rel.relationship_type.name }}
