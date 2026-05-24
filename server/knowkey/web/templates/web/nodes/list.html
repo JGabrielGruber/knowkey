@@ -3,6 +3,9 @@
 {% block content %}
 <!-- Top Navbar with Search -->
 <div class="navbar bg-base-100/80 backdrop-blur-md border-b border-base-300 sticky top-0 z-50">
+    <div class="xl:hidden">
+        <a href="/" class="btn btn-ghost text-2xl font-bold">Knowkey</a>
+    </div>
     <div class="max-w-6xl mx-auto w-full">
         <div class="flex-1">
             <form hx-get="/nodes/" 
@@ -21,7 +24,7 @@
             </form>
         </div>
     </div>
-    <div class="flex-none fixed">
+    <div class="flex-none fixed hidden xl:flex">
         <a href="/" class="btn btn-ghost text-2xl font-bold">Knowkey</a>
     </div>
 </div>

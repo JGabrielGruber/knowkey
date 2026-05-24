@@ -1,8 +1,11 @@
 <div id="graph-container" class="w-full border border-base-300 rounded-3xl bg-base-200" style="height: 720px;"></div>
+<div id="color-primary" class="hidden bg-primary text-primary-content"></div>
+<div id="color-secondary" class="hidden bg-secondary text-secondary-content"></div>
+<div id="color-neutral" class="hidden bg-neutral text-neutral-content"></div>
+<div id="color-base" class="hidden bg-base text-base-content"></div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-
+  document.addEventListener('DOMContentLoaded', function () {
 
     function oklchToHex(L, C, hDeg) {
       // OKLCH -> OKLab
@@ -21,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const s = s_ * s_ * s_;
 
       // LMS -> linear sRGB
-      let r =  4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+      let r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
       let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
       let bChan = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
 
@@ -49,32 +52,29 @@ document.addEventListener('DOMContentLoaded', function() {
     function extractColor(color) {
       const oklchMatch = color.match(/oklch\(\s*([+-]?\d*\.?\d+)\s+([+-]?\d*\.?\d+)\s+([+-]?\d*\.?\d+)\s*\)/i);
       if (oklchMatch) {
-          const l = parseFloat(oklchMatch[1]);
-          const c = parseFloat(oklchMatch[2]);
-          const h = parseFloat(oklchMatch[3]);
-          return oklchToHex(l, c, h)
+        const l = parseFloat(oklchMatch[1]);
+        const c = parseFloat(oklchMatch[2]);
+        const h = parseFloat(oklchMatch[3]);
+        return oklchToHex(l, c, h)
       }
       const rgbMatch = color.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
       if (rgbMatch) {
-          const r = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
-          const g = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
-          const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
-          return '#' + r + g + b;
+        const r = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
+        const g = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
+        const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
+        return '#' + r + g + b;
       }
     }
 
 
     // Extract DaisyUI / Tailwind colors from computed styles
     function getThemeColor(varName) {
-        const temp = document.createElement('div');
-        temp.className = `bg-${varName} text-${varName}-content`;
-        document.body.appendChild(temp);
-        
-        const bg = extractColor(getComputedStyle(temp).backgroundColor);
-        const text = extractColor(getComputedStyle(temp).color);
-        
-        document.body.removeChild(temp);
-        return { bg, text };
+      const temp = document.getElementById(`color-${varName}`);
+
+      const bg = extractColor(getComputedStyle(temp).backgroundColor);
+      const text = extractColor(getComputedStyle(temp).color);
+
+      return {bg, text};
     }
 
     const primary = getThemeColor('primary');
@@ -83,66 +83,66 @@ document.addEventListener('DOMContentLoaded', function() {
     const base = getThemeColor('base');
 
     const cy = cytoscape({
-        container: document.getElementById('graph-container'),
-        elements: {{ graph_data|safe }},
+      container: document.getElementById('graph-container'),
+      elements: {{graph_data| safe }},
 
-        style: [
-            {
-                selector: 'node',
-                style: {
-                    'label': 'data(label)',
-                    'background-color': primary.bg,
-                    'color': primary.text,
-                    'text-valign': 'bottom',
-                    'text-halign': 'center',
-                    'font-size': '8px',
-                    'font-weight': '500',
-                    'width': 24,
-                    'height': 24,
-                    'text-margin-y': 10,
-                    'text-wrap': 'none',
-                    'text-max-width': '130px'
-                }
-            },
-            {
-                selector: 'edge',
-                style: {
-                    'width': 2.5,
-                    'line-color': secondary.bg,
-                    'line-opacity': 0.65,
-                    'target-arrow-color': secondary.bg,
-                    'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
-                    'label': '',
-                    'color': secondary.text,
-                    'font-size': '6px',
-                    'text-rotation': 'autorotate',
-                }
-            },
-        ],
+    style: [
+    {
+      selector: 'node',
+      style: {
+        'label': 'data(label)',
+        'background-color': primary.bg,
+        'color': primary.text,
+        'text-valign': 'bottom',
+        'text-halign': 'center',
+        'font-size': '8px',
+        'font-weight': '500',
+        'width': 24,
+        'height': 24,
+        'text-margin-y': 10,
+        'text-wrap': 'none',
+        'text-max-width': '130px'
+      }
+    },
+    {
+      selector: 'edge',
+      style: {
+        'width': 2.5,
+        'line-color': secondary.bg,
+        'line-opacity': 0.65,
+        'target-arrow-color': secondary.bg,
+        'target-arrow-shape': 'triangle',
+        'curve-style': 'bezier',
+        'label': '',
+        'color': secondary.text,
+        'font-size': '6px',
+        'text-rotation': 'autorotate',
+      }
+    },
+  ],
 
-        layout: {
-            name: 'cose',
-            animate: true,
-            animationDuration: 1200,
-            idealEdgeLength: 95,
-            nodeRepulsion: 14000,
-            gravity: 0.7
-        }
+    layout: {
+    name: 'cose',
+    animate: true,
+    animationDuration: 1200,
+    idealEdgeLength: 95,
+    nodeRepulsion: 14000,
+    gravity: 0.7
+  }
     });
 
-    // Click node to go to detail
-    cy.on('tap', 'node', function(evt){
-        window.location.href = `/nodes/${evt.target.id()}/`;
-    });
+  // Click node to go to detail
+  cy.on('tap', 'node', function (evt) {
+    window.location.href = `/nodes/${evt.target.id()}/`;
+  });
 
-    // Show relationship label on edge hover
-    cy.on('mouseover', 'edge', function(evt){
-        evt.target.style('label', evt.target.data('label'));
-    });
+  // Show relationship label on edge hover
+  cy.on('mouseover', 'edge', function (evt) {
+    evt.target.style('label', evt.target.data('label'));
+  });
 
-    cy.on('mouseout', 'edge', function(evt){
-        evt.target.style('label', '');
-    });
+  cy.on('mouseout', 'edge', function (evt) {
+    evt.target.style('label', '');
+  });
 });
 </script>

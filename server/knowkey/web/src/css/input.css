@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@source not "./tailwindcss";
+@source not "../plugins/daisyui{,*}.mjs";
+@source not "../plugins/typography.js";
+
+@plugin "@tailwindcss/typography";
+@plugin "../plugins/daisyui.mjs" {
+  themes: all
+}
+
+@import "./style.css";

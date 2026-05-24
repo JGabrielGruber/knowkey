@@ -11,6 +11,7 @@ cachetools==7.1.2
 caio==0.9.25
 certifi==2026.4.22
 cffi==2.0.0
+charset-normalizer==3.4.7
 click==8.4.0
 cryptography==48.0.0
 cyclopts==4.14.0
@@ -79,6 +80,7 @@ python-multipart==0.0.29
 PyYAML==6.0.3
 redis==7.4.0
 referencing==0.37.0
+requests==2.34.2
 rich==15.0.0
 rich-rst==2.0.1
 rpds-py==0.30.0
@@ -93,6 +95,7 @@ types-psycopg2==2.9.21.20260509
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uncalled-for==0.3.2
+urllib3==2.7.0
 uvicorn==0.47.0
 watchfiles==1.2.0
 websockets==16.0

@@ -1,0 +1,34 @@
+@tailwind utilities;
+
+/* Global DaisyUI Defaults for HTML Elements */
+/* This makes <button>, <input>, etc. use DaisyUI styles automatically */
+
+/* Use the @layer base directive to ensure these styles are injected
+   into Tailwind's base layer, overriding Preflight for these specific elements. */
+@layer components {
+  body {
+    @apply bg-base-200 min-h-screen;
+  }
+
+  .form-control input {
+    @apply input w-full;
+  }
+
+
+}
+
+@layer daisyui.component {
+  .menu-neutral {
+    @layer daisyui.modifier {
+      --menu-active-fg: var(--color-neutral);
+      --menu-active-bg: var(--color-neutral-content);
+
+      :where(a:not(.menu-active)):hover {
+        @apply bg-neutral-content/10;
+      }
+      :where(.menu-active):hover {
+        @apply bg-neutral-content/70;
+      }
+    }
+  }
+}
