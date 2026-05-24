@@ -27,9 +27,9 @@ def get_current_theme(context):
     """
     request = context["request"]
     theme = request.COOKIES.get(settings.THEME_COOKIE_NAME)
-    if theme in getattr(settings, "AVAILABLE_THEMES", ["light", "dark"]):
+    if theme in getattr(settings, "AVAILABLE_THEMES", ["nord", "dim"]):
         return theme
-    return getattr(settings, "AVAILABLE_THEMES", ["light", "dark"])[0]
+    return getattr(settings, "AVAILABLE_THEMES", ["nord", "dim"])[0]
 
 
 @register.simple_tag
@@ -37,4 +37,4 @@ def get_available_themes():
     """
     Returns the list of available themes.
     """
-    return getattr(settings, "AVAILABLE_THEMES", ["light", "dark"])
+    return getattr(settings, "AVAILABLE_THEMES", ["nord", "dim"])

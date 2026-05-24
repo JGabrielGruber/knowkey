@@ -35,6 +35,12 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split("
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Sessions
+# https://docs.djangoproject.com/en/5.2/ref/settings/#sessions
+
+SESSION_COOKIE_DOMAIN = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
+CSRF_COOKIE_DOMAIN = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
+
 # Application definition
 
 INSTALLED_APPS = [

@@ -1187,6 +1187,9 @@
   .z-50 {
     z-index: 50;
   }
+  .z-500 {
+    z-index: 500;
+  }
   .hero {
     @layer daisyui.l1.l2.l3 {
       display: grid;
