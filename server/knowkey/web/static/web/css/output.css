@@ -1111,17 +1111,11 @@
       }
     }
   }
-  .end-0 {
-    inset-inline-end: calc(var(--spacing) * 0);
-  }
   .top-0 {
     top: calc(var(--spacing) * 0);
   }
   .top-px {
     top: 1px;
-  }
-  .right-0 {
-    right: calc(var(--spacing) * 0);
   }
   .join {
     display: inline-flex;
@@ -2205,9 +2199,6 @@
   .w-full {
     width: 100%;
   }
-  .max-w-2xl {
-    max-width: var(--container-2xl);
-  }
   .max-w-4xl {
     max-width: var(--container-4xl);
   }
@@ -2453,10 +2444,6 @@
     font-size: var(--text-2xl);
     line-height: var(--tw-leading, var(--text-2xl--line-height));
   }
-  .text-4xl {
-    font-size: var(--text-4xl);
-    line-height: var(--tw-leading, var(--text-4xl--line-height));
-  }
   .text-5xl {
     font-size: var(--text-5xl);
     line-height: var(--tw-leading, var(--text-5xl--line-height));
@@ -2464,10 +2451,6 @@
   .text-6xl {
     font-size: var(--text-6xl);
     line-height: var(--tw-leading, var(--text-6xl--line-height));
-  }
-  .text-8xl {
-    font-size: var(--text-8xl);
-    line-height: var(--tw-leading, var(--text-8xl--line-height));
   }
   .text-base {
     font-size: var(--text-base);
@@ -2569,20 +2552,11 @@
       color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
     }
   }
-  .text-neutral {
-    color: var(--color-neutral);
-  }
   .text-neutral-content {
     color: var(--color-neutral-content);
   }
-  .text-primary {
-    color: var(--color-primary);
-  }
   .text-primary-content {
     color: var(--color-primary-content);
-  }
-  .text-secondary {
-    color: var(--color-secondary);
   }
   .text-secondary-content {
     color: var(--color-secondary-content);
@@ -2747,45 +2721,15 @@
       max-width: var(--container-md);
     }
   }
-  .sm\:max-w-sm {
-    @media (width >= 40rem) {
-      max-width: var(--container-sm);
-    }
-  }
-  .md\:fixed {
-    @media (width >= 48rem) {
-      position: fixed;
-    }
-  }
   .md\:max-w-lg {
     @media (width >= 48rem) {
       max-width: var(--container-lg);
-    }
-  }
-  .md\:max-w-md {
-    @media (width >= 48rem) {
-      max-width: var(--container-md);
     }
   }
   .md\:text-8xl {
     @media (width >= 48rem) {
       font-size: var(--text-8xl);
       line-height: var(--tw-leading, var(--text-8xl--line-height));
-    }
-  }
-  .lg\:fixed {
-    @media (width >= 64rem) {
-      position: fixed;
-    }
-  }
-  .lg\:flex {
-    @media (width >= 64rem) {
-      display: flex;
-    }
-  }
-  .lg\:hidden {
-    @media (width >= 64rem) {
-      display: none;
     }
   }
   .lg\:max-w-2xl {
