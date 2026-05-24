@@ -85,9 +85,9 @@ class Command(BaseCommand):
             )
 
         # ------------------------------------------------------------------
-        # 2. Download daisyUI latest plugin files
+        # 2. Download latest plugins files
         # ------------------------------------------------------------------
-        daisy_files = [
+        plugins_files = [
             (
                 "daisyui.mjs",
                 "https://github.com/saadeghi/daisyui/releases/latest/download/daisyui.mjs",
@@ -96,26 +96,30 @@ class Command(BaseCommand):
                 "daisyui-theme.mjs",
                 "https://github.com/saadeghi/daisyui/releases/latest/download/daisyui-theme.mjs",
             ),
+            (
+                "typography.js",
+                "https://cdn.jsdelivr.net/npm/@tailwindcss/typography@latest/src/index.min.js",
+            ),
         ]
 
-        for name, url in daisy_files:
+        for name, url in plugins_files:
             dest = plugins_dir / name
             if not force and dest.exists():
                 self.stdout.write(
-                    self.style.WARNING(f"daisyUI file already exists: {dest}")
+                    self.style.WARNING(f"Plugin file already exists: {dest}")
                 )
                 continue
 
-            self.stdout.write(f"Downloading daisyUI {name} ...")
+            self.stdout.write(f"Downloading plugin {name} ...")
             self._download_file(url, dest)
 
-        self.stdout.write(self.style.SUCCESS("daisyUI plugin files downloaded"))
+        self.stdout.write(self.style.SUCCESS("All plugin files downloaded"))
 
         # ------------------------------------------------------------------
         # Final instructions
         # ------------------------------------------------------------------
         self.stdout.write(
-            "\nAll set! Remember to reference daisyUI in your tailwind.config.js:"
+            "\nAll set! Remember to reference plugins in your tailwind.config.js:"
         )
         self.stdout.write(self.style.SUCCESS("""
 # knowkey/web/src/tailwind.config.js

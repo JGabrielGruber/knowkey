@@ -1,6 +1,7 @@
 {% extends "web/base.html" %}
 
 {% load theme %}
+{% load markdown %}
 
 {% block title %}{{ node.title }} | Knowkey{% endblock %}
 
@@ -62,8 +63,11 @@
         {% if node.content %}
         <div class="mt-12 border-t border-base-300 pt-10">
             <h2 class="text-2xl font-semibold mb-6">Content</h2>
-            <div class="prose prose-base max-w-none">
-                {{ node.content|linebreaks }}
+            <div class="prose prose-base max-w-none 
+                prose-headings:font-semibold 
+                prose-a:text-primary hover:prose-a:underline
+                dark:prose-invert">
+                {{ node.content|markdown }}
             </div>
         </div>
         {% endif %}
