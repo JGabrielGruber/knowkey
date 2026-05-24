@@ -11,10 +11,10 @@ def theme_selector(context):
     """
     request = context["request"]
     current_theme = request.COOKIES.get(
-        settings.THEME_COOKIE_NAME, getattr(settings, "AVAILABLE_THEMES", ["light"])[0]
+        settings.THEME_COOKIE_NAME, getattr(settings, "AVAILABLE_THEMES", ["nord"])[0]
     )
     return {
-        "themes": getattr(settings, "AVAILABLE_THEMES", ["light", "dark"]),
+        "themes": getattr(settings, "AVAILABLE_THEMES", ["nord", "dim"]),
         "current_theme": current_theme,
         "next_url": request.path,
     }
