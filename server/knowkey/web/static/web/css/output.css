@@ -1074,6 +1074,9 @@
   .fixed {
     position: fixed;
   }
+  .relative {
+    position: relative;
+  }
   .static {
     position: static;
   }
@@ -1113,6 +1116,9 @@
   }
   .top-px {
     top: 1px;
+  }
+  .right-0 {
+    right: calc(var(--spacing) * 0);
   }
   .join {
     display: inline-flex;
@@ -2782,6 +2788,11 @@
   .lg\:max-w-2xl {
     @media (width >= 64rem) {
       max-width: var(--container-2xl);
+    }
+  }
+  .xl\:fixed {
+    @media (width >= 80rem) {
+      position: fixed;
     }
   }
   .xl\:flex {
