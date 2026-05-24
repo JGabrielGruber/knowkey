@@ -86,15 +86,11 @@ def get_graph_data(nodes):
 
 
 def node_detail(request, pk):
-    context = {}
-
-    # Base node fetch
     node = get_object_or_404(
         Node.objects.select_related("node_type", "author").prefetch_related("tags"),
         pk=pk,
     )
 
-    # Fetch relationships and filter in Python (safer)
     all_outgoing = node.outgoing_relationships.select_related(
         "target", "relationship_type"
     ).all()
@@ -103,7 +99,14 @@ def node_detail(request, pk):
         "source", "relationship_type"
     ).all()
 
-    # Filter only latest versions
+    context = {
+        "node": node,
+        "og_title": node.title,
+        "og_description": node.summary or node.content[:200] if node.content else "",
+        "og_url": request.build_absolute_uri(),
+        "og_type": "article",
+    }
+
     context["outgoing"] = [
         rel for rel in all_outgoing if rel.source.is_latest and rel.target.is_latest
     ]
@@ -111,7 +114,5 @@ def node_detail(request, pk):
     context["incoming"] = [
         rel for rel in all_incoming if rel.source.is_latest and rel.target.is_latest
     ]
-
-    context["node"] = node
 
     return render(request, "web/nodes/detail.html", context=context)

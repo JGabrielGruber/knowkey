@@ -8,7 +8,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Knowkey</title>
+    <title>{% block title %}Knowkey{% endblock %}</title>
+    
+    <!-- Default Meta -->
+    <meta name="description" content="{% block meta_description %}Your personal knowledge graph{% endblock %}">
+
+    <!-- Open Graph / Social Meta -->
+    {% block social_meta %}
+        <meta property="og:title" content="{% block og_title %}Knowkey{% endblock %}">
+        <meta property="og:description" content="{% block og_description %}Personal Knowledge Graph{% endblock %}">
+        <meta property="og:type" content="article">
+        <meta property="og:url" content="{% block og_url %}{{ request.build_absolute_uri }}{% endblock %}">
+        <meta property="og:site_name" content="Knowkey">
+        <!-- Optional: image -->
+        <meta property="og:image" content="{% block og_image %}{% endblock %}">
+        
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{% block twitter_title %}{% endblock %}">
+        <meta name="twitter:description" content="{% block twitter_description %}{% endblock %}">
+    {% endblock %}
     
     <link href="{% static 'web/css/output.css' %}" rel="stylesheet" type="text/css" />
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
