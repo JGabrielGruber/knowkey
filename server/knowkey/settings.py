@@ -30,6 +30,8 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
+ADMIN_ENABLED = os.getenv("DJANGO_ADMIN_ENABLED", "True").lower() == "true"
+
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 USE_X_FORWARDED_HOST = True
@@ -37,6 +39,26 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Sessions
 # https://docs.djangoproject.com/en/5.2/ref/settings/#sessions
+
+
+CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_DOMAIN", "localhost")
+
+SESSION_COOKIE_DOMAIN = os.getenv("DJANGO_DOMAIN", "localhost")
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_DOMAIN = os.getenv("DJANGO_DOMAIN", "localhost")
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "Lax"
+
+CORS_ALLOWED_ORIGINS = os.getenv("DJANGO_DOMAIN", "localhost")
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
+CORS_EXPOSE_HEADERS = [
+    "etag",
+]
 
 SESSION_COOKIE_DOMAIN = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
 CSRF_COOKIE_DOMAIN = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
@@ -165,6 +187,8 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # Theme settings
 
 AVAILABLE_THEMES = [
+    "nord",
+    "dim",
     "light",
     "dark",
     "cupcake",
@@ -194,8 +218,6 @@ AVAILABLE_THEMES = [
     "night",
     "coffee",
     "winter",
-    "dim",
-    "nord",
     "sunset",
     "caramellatte",
     "abyss",
