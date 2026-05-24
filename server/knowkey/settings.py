@@ -41,16 +41,16 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # https://docs.djangoproject.com/en/5.2/ref/settings/#sessions
 
 
-CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_DOMAIN", "localhost")
+CSRF_TRUSTED_ORIGINS = [os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")]
 
-SESSION_COOKIE_DOMAIN = os.getenv("DJANGO_DOMAIN", "localhost")
+SESSION_COOKIE_DOMAIN = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_DOMAIN = os.getenv("DJANGO_DOMAIN", "localhost")
+CSRF_COOKIE_DOMAIN = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "Lax"
 
-CORS_ALLOWED_ORIGINS = os.getenv("DJANGO_DOMAIN", "localhost")
+CORS_ALLOWED_ORIGINS = os.getenv("DJANGO_ALLOWED_DOMAIN", "localhost")
 
 CORS_ALLOW_CREDENTIALS = True
 
