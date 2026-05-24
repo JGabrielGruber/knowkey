@@ -1,7 +1,10 @@
 {% load static %}
+{% load theme %}
+
+{% get_current_theme as THEME_CODE %}
 
 <!DOCTYPE html>
-<html lang="en" data-theme="nord">
+<html lang="en" data-theme="{{ THEME_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

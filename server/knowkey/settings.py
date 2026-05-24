@@ -155,3 +155,50 @@ REST_FRAMEWORK = {
 # Redis
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Theme settings
+
+AVAILABLE_THEMES = [
+    "light",
+    "dark",
+    "cupcake",
+    "bumblebee",
+    "emerald",
+    "corporate",
+    "synthwave",
+    "retro",
+    "cyberpunk",
+    "valentine",
+    "halloween",
+    "garden",
+    "forest",
+    "aqua",
+    "lofi",
+    "pastel",
+    "fantasy",
+    "wireframe",
+    "black",
+    "luxury",
+    "dracula",
+    "cmyk",
+    "autumn",
+    "business",
+    "acid",
+    "lemonade",
+    "night",
+    "coffee",
+    "winter",
+    "dim",
+    "nord",
+    "sunset",
+    "caramellatte",
+    "abyss",
+    "silk",
+]
+THEME_COOKIE_NAME = "theme"  # Name of the cookie
+THEME_COOKIE_AGE = 365 * 24 * 60 * 60  # Cookie duration (1 year)
+THEME_COOKIE_PATH = "/"  # Cookie path
+THEME_COOKIE_DOMAIN = None  # Set to your domain if needed
+THEME_COOKIE_SECURE = False  # True for HTTPS-only
+THEME_COOKIE_HTTPONLY = False  # True to restrict JS access
+THEME_COOKIE_SAMESITE = "Lax"  # Cookie SameSite policy

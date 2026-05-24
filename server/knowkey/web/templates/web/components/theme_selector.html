@@ -1,0 +1,45 @@
+{% load theme %}
+
+<form action="{% url 'web:set_theme' %}" method="post">
+  {% csrf_token %}
+  <div title="Change Theme" class="dropdown dropdown-end block ">
+    <div tabindex="0" role="button" class="btn btn-ghost btn-sm group gap-1.5" aria-label="Change Theme">
+      <div
+        class="bg-base-100 group-hover:border-base-content/20 border-base-content/10 grid shrink-0 grid-cols-2 gap-0.5 rounded-md border p-1 transition-colors">
+        <div class="bg-base-content size-1 rounded-full"></div>
+        <div class="bg-primary size-1 rounded-full"></div>
+        <div class="bg-secondary size-1 rounded-full"></div>
+        <div class="bg-accent size-1 rounded-full"></div>
+      </div>
+      <span class="size-4 opacity-60 sm:inline-block">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          class="lucide lucide-chevron-down-icon lucide-chevron-down">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </span>
+    </div>
+    <div tabindex="0"
+      class="dropdown-content bg-base-100 text-base-content rounded-box top-px h-[30.5rem] max-h-[calc(100vh-8.6rem)] overflow-y-auto border-[length:var(--border)] border-white/5 shadow-2xl outline-[length:var(--border)] outline-black/5 mt-8">
+      <ul class="menu w-56">
+        <li class="menu-title text-xs">Theme</li>
+        {% for theme in themes %}
+        <li>
+          <button name="theme" value="{{ theme }}" type="submit"
+            class="gap-3 px-2 {% if theme == current_theme %} menu-active {% endif %}">
+            <div data-theme="{{ theme }}"
+              class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-1 shadow-sm">
+              <div class="bg-base-content size-1 rounded-full"></div>
+              <div class="bg-primary size-1 rounded-full"></div>
+              <div class="bg-secondary size-1 rounded-full"></div>
+              <div class="bg-accent size-1 rounded-full"></div>
+            </div>
+            <div class="w-32 truncate">{{ theme }}</div>
+          </button>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <input type="hidden" name="next" value="{{ request.path }}">
+</form>
